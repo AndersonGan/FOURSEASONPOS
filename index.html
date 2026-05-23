@@ -257,6 +257,71 @@
 
     .dine-in-info { padding: 10px 14px; }
   }
+
+  /* THEME TOGGLE BUTTON */
+  .theme-toggle { background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 16px; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; line-height: 1; transition: background 0.15s; }
+  .theme-toggle:hover { background: rgba(255,255,255,0.28); }
+
+  /* ─── DARK MODE ─── */
+  body.dark { background: #161616; color: #e0e0e0; }
+  body.dark .cat-bar { background: #161616; }
+  body.dark .cat-btn { background: #262626; border-color: #383838; color: #b8b8b8; box-shadow: none; }
+  body.dark .cat-btn.active { background: #0e7c6b; color: #fff; }
+  body.dark .search-bar { background: #161616; }
+  body.dark .search-bar input { background: #262626; border-color: #383838; color: #e8e8e8; box-shadow: none; }
+  body.dark .search-bar input::placeholder { color: #707070; }
+  body.dark .search-clear { background: #383838; color: #b8b8b8; }
+  body.dark .menu-item { background: #262626; border-color: #383838; color: #e0e0e0; box-shadow: none; }
+  body.dark .menu-item .item-name { color: #f0f0f0; }
+  body.dark .menu-item .item-subtitle { color: #888; }
+  body.dark .menu-section-header { color: #2ddbbf; border-color: #1f3d38; }
+  body.dark .order-side { background: #1f1f1f; border-color: #383838; }
+  body.dark .order-header { border-color: #383838; }
+  body.dark .order-header h2 { color: #f0f0f0; }
+  body.dark .order-row { border-color: #2e2e2e; }
+  body.dark .order-row .info .name { color: #f0f0f0; }
+  body.dark .order-row .info .each { color: #888; }
+  body.dark .order-row .info .custom-tag { color: #aaa; }
+  body.dark .qty-btn { background: #262626; border-color: #383838; color: #2ddbbf; }
+  body.dark .qty-num { color: #f0f0f0; }
+  body.dark .remove-btn { color: #555; }
+  body.dark .note-btn { background: #262626; border-color: #383838; color: #888; }
+  body.dark .note-btn.has-note { color: #2ddbbf; }
+  body.dark .note-input { background: #262626; border-color: #383838; color: #e8e8e8; }
+  body.dark .note-input::placeholder { color: #707070; }
+  body.dark .note-display { color: #aaa; }
+  body.dark .order-footer { background: #1a1a1a; border-color: #383838; }
+  body.dark .order-meta { color: #888; }
+  body.dark .total-label { color: #f0f0f0; }
+  body.dark .total-amount { color: #ff7766; }
+  body.dark .empty-state { color: #555; }
+  body.dark .print-btn { background: #2a2a2a; color: #555; }
+  body.dark .print-btn.enabled { background: #0e7c6b; color: #fff; }
+  body.dark .dine-in-info { background: #15302a; border-color: #1f4a3d; }
+  body.dark .dine-in-field label { color: #6bd6a0; }
+  body.dark .dine-in-field input { background: #262626; border-color: #1f4a3d; color: #f0f0f0; }
+  body.dark .pickup-info { background: #2a2418; border-color: #4a3a1f; }
+  body.dark .pickup-label { color: #f0c060; }
+  body.dark .pickup-time-display { color: #f0f0f0; }
+  body.dark .pickup-btn { background: #262626; border-color: #383838; color: #e8e8e8; }
+  body.dark .pickup-btn.minus { color: #ff7766; border-color: #5a2e2e; }
+  body.dark .pickup-btn.plus { color: #2ddbbf; border-color: #1f4a3d; }
+  body.dark .spice-modal, body.dark .combo-modal { background: #262626; color: #e8e8e8; }
+  body.dark .spice-modal h3, body.dark .combo-modal h3 { color: #f0f0f0; }
+  body.dark .spice-modal .item-label, body.dark .combo-modal .item-label { color: #aaa; }
+  body.dark .spice-option { background: #1f1f1f; border-color: #383838; }
+  body.dark .spice-option .spice-name { color: #f0f0f0; }
+  body.dark .spice-option .spice-desc { color: #888; }
+  body.dark .spice-option.selected { background: #15302a; }
+  body.dark .btn-cancel { background: #262626; border-color: #383838; color: #e0e0e0; }
+  body.dark .combo-section-title { color: #2ddbbf; }
+  body.dark .combo-item-row { background: #1f1f1f; }
+  body.dark .combo-item-row .item-name { color: #f0f0f0; }
+  body.dark .combo-item-row .item-original { color: #888; }
+  body.dark .combo-item-row select { background: #262626; border-color: #383838; color: #e8e8e8; }
+  body.dark .sauce-tag.free { background: #15302a; color: #6bd6a0; border-color: #1f4a3d; }
+  body.dark .sauce-tag.paid { background: #2a2418; color: #f0c060; border-color: #4a3a1f; }
+  body.dark .rice-tag { background: #15302a; color: #6bd6a0; border-color: #1f4a3d; }
 </style>
 </head>
 <body>
@@ -275,6 +340,7 @@
           <button class="active" data-type="Dine In">Dine In</button>
           <button data-type="Take Out">Take Out</button>
         </div>
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
         <span class="datetime" id="datetime"></span>
       </div>
     </div>
@@ -2137,7 +2203,25 @@ window.addEventListener('resize', function() {
 function updateClock() { document.getElementById("datetime").textContent = getDateTime(); }
 setInterval(updateClock, 30000);
 
+// ─── DARK MODE ───
+function toggleTheme() {
+  haptic('light');
+  const isDark = document.body.classList.toggle('dark');
+  document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+  try { localStorage.setItem('fourSeasonTheme', isDark ? 'dark' : 'light'); } catch(e) {}
+}
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('fourSeasonTheme'); } catch(e) {}
+  if (saved === 'dark') {
+    document.body.classList.add('dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  }
+}
+
 // Init
+initTheme();
 updateClock();
 renderCategories();
 renderMenuItems();

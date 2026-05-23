@@ -93,7 +93,15 @@
   .qty-num { font-weight: 700; font-size: 19.8px; min-width: 26px; text-align: center; color: #222; }
   .row-total { font-weight: 700; font-size: 18.7px; min-width: 50px; text-align: right; color: #0e7c6b; }
   .remove-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 22px; padding: 0 4px; line-height: 1; }
-
+  .note-btn { background: none; border: none; color: #b5ae9f; cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; transition: color 0.15s; flex-shrink: 0; }
+  .note-btn:hover { color: #0e7c6b; }
+  .note-btn.has-note { color: #0e7c6b; }
+  .note-row { padding: 4px 0 8px; display: none; }
+  .note-row.show { display: block; }
+  .note-input { width: 100%; padding: 7px 10px; border: 1.5px solid #d6d1c7; border-radius: 8px; font-size: 13px; font-family: inherit; color: #333; background: #faf8f4; resize: none; line-height: 1.4; }
+  .note-input:focus { outline: none; border-color: #0e7c6b; background: #fff; }
+  .note-input::placeholder { color: #c0b9ad; }
+  .note-display { font-size: 13px; color: #777; margin-top: 3px; font-style: italic; line-height: 1.4; }
   .order-footer { padding: 16px 20px 20px; padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)); border-top: 1px solid #eee; background: #fdfbf6; }
   .order-meta { display: flex; justify-content: space-between; font-size: 14px; color: #aaa; margin-bottom: 10px; }
   .total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
@@ -1736,6 +1744,29 @@ function closeFamilyModal() {
   familyPeopleCount = 2;
 }
 
+function toggleNoteRow(idx) {
+  const noteRow = document.getElementById(`note-row-${idx}`);
+  const noteInput = document.getElementById(`note-input-${idx}`);
+  if (!noteRow) return;
+  const isShowing = noteRow.classList.toggle('show');
+  if (isShowing) {
+    noteInput.focus();
+    noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
+  }
+}
+
+function saveNote(idx, value) {
+  if (!order[idx]) return;
+  order[idx].note = value.trim();
+  // Update button highlight without re-rendering
+  const row = document.getElementById(`note-row-${idx}`);
+  if (row) {
+    const noteBtn = row.parentElement.querySelector('.note-btn');
+    if (noteBtn) noteBtn.classList.toggle('has-note', value.trim().length > 0);
+  }
+}
+
+
 function changeQty(idx, delta) {
   haptic('light');
   order[idx].qty += delta;
@@ -1822,20 +1853,32 @@ function renderOrder() {
         customTag = `<div class="custom-tag">${item.customizationSummary}</div>`;
       }
       
+      const hasNote = item.note && item.note.trim().length > 0;
+      const noteRowId = `note-row-${idx}`;
+      const noteInputId = `note-input-${idx}`;
       row.innerHTML = `
-        <div class="info">
-          <div class="name">${item.name}</div>
-          <div class="each">${eachText}</div>
-          ${spiceTag}${riceTag}${sauceTag}
-          ${customTag}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="info" style="flex:1;min-width:0;">
+              <div class="name">${item.name}</div>
+              <div class="each">${eachText}</div>
+              ${spiceTag}${riceTag}${sauceTag}
+              ${customTag}
+              ${hasNote ? `<div class="note-display">📝 ${item.note}</div>` : ''}
+            </div>
+            <div class="qty-controls">
+              <button class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
+              <span class="qty-num">${item.qty}</span>
+              <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+            </div>
+            <span class="row-total">${(item.sauce && item.price === 0) ? 'FREE' : fp(displayPrice * item.qty)}</span>
+            <button class="note-btn ${hasNote ? 'has-note' : ''}" title="Add note" onclick="toggleNoteRow(${idx})">📝</button>
+            <button class="remove-btn" onclick="removeItem(${idx})">×</button>
+          </div>
+          <div class="note-row" id="${noteRowId}">
+            <textarea class="note-input" id="${noteInputId}" rows="2" placeholder="e.g. no onions, extra sauce, allergy note…" oninput="saveNote(${idx}, this.value)">${item.note || ''}</textarea>
+          </div>
         </div>
-        <div class="qty-controls">
-          <button class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
-          <span class="qty-num">${item.qty}</span>
-          <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
-        </div>
-        <span class="row-total">${(item.sauce && item.price === 0) ? 'FREE' : fp(displayPrice * item.qty)}</span>
-        <button class="remove-btn" onclick="removeItem(${idx})">×</button>
       `;
       container.appendChild(row);
     });
@@ -1924,9 +1967,10 @@ function completeOrder() {
     let modText = modifiers.length > 0 ? `<span class="r-spice"> (${modifiers.join(', ')})</span>` : '';
     
     let customText = (item.customizationSummary && item.customizationSummary.length > 0) ? `<span class="r-custom">${item.customizationSummary}</span>` : '';
+    let noteText = (item.note && item.note.trim().length > 0) ? `<span class="r-custom">📝 ${item.note}</span>` : '';
     
     const priceDisplay = (item.sauce && item.price === 0) ? 'FREE' : fp(item.price * item.qty);
-    div.innerHTML = `<div class="r-item-line"><span><span class="r-qty">${item.qty}x</span> ${item.name}${modText}</span><span class="r-price">${priceDisplay}</span></div>${customText}`;
+    div.innerHTML = `<div class="r-item-line"><span><span class="r-qty">${item.qty}x</span> ${item.name}${modText}</span><span class="r-price">${priceDisplay}</span></div>${customText}${noteText}`;
     rItems.appendChild(div);
   });
 

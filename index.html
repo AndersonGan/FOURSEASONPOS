@@ -262,6 +262,12 @@
   .theme-toggle { background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 16px; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; line-height: 1; transition: background 0.15s; }
   .theme-toggle:hover { background: rgba(255,255,255,0.28); }
 
+  /* UNDO TOAST */
+  .undo-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120%); background: #1a1a1a; color: #fff; padding: 12px 16px 12px 20px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; z-index: 10000; transition: transform 0.25s cubic-bezier(.4,1.4,.6,1); max-width: 90vw; }
+  .undo-toast.show { transform: translateX(-50%) translateY(0); }
+  .undo-toast button { background: none; border: none; color: #2ddbbf; font-weight: 700; font-size: 15px; cursor: pointer; padding: 4px 12px; border-radius: 6px; font-family: inherit; }
+  .undo-toast button:hover { background: rgba(45,219,191,0.12); }
+
   /* ─── DARK MODE ─── */
   body.dark { background: #161616; color: #e0e0e0; }
   body.dark .cat-bar { background: #161616; }
@@ -382,8 +388,9 @@
     </div>
     <div class="order-items" id="orderItems">
       <div class="empty-state" id="emptyState">
-        <svg width="52" height="52" viewBox="0 0 52 52" fill="none"><path d="M8 14h5l4 20h22l4.5-15H14" stroke="#d0c9bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="42" r="3" stroke="#d0c9bd" stroke-width="2"/><circle cx="37" cy="42" r="3" stroke="#d0c9bd" stroke-width="2"/></svg>
-        <span>Tap any item to add it to the<br>order</span>
+        <svg width="64" height="64" viewBox="0 0 52 52" fill="none"><path d="M8 14h5l4 20h22l4.5-15H14" stroke="#d0c9bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="42" r="3" stroke="#d0c9bd" stroke-width="2"/><circle cx="37" cy="42" r="3" stroke="#d0c9bd" stroke-width="2"/></svg>
+        <span style="font-weight:600;font-size:17px;">No items yet</span>
+        <span style="font-size:14px;margin-top:-6px;">Tap any menu item to start an order</span>
       </div>
     </div>
     <div class="order-footer">
@@ -1011,15 +1018,18 @@ function renderCategories() {
 function renderMenuItems() {
   const grid = document.getElementById("menuGrid");
   grid.innerHTML = "";
-  const searchTerm = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+  const rawSearch = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+  const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const searchTerm = rawSearch;
+  const searchNorm = normalize(rawSearch);
   
   // If searching, show results across all categories
   if (searchTerm.length > 0) {
     let resultCount = 0;
     Object.keys(menu).forEach(cat => {
       const matches = menu[cat].filter(item => {
-        const nameMatch = item.name.toLowerCase().includes(searchTerm);
-        const subtitleMatch = item.subtitle && item.subtitle.toLowerCase().includes(searchTerm);
+        const nameMatch = item.name.toLowerCase().includes(searchTerm) || normalize(item.name).includes(searchNorm);
+        const subtitleMatch = item.subtitle && (item.subtitle.toLowerCase().includes(searchTerm) || normalize(item.subtitle).includes(searchNorm));
         return nameMatch || subtitleMatch;
       });
       if (matches.length === 0) return;
@@ -1842,17 +1852,86 @@ function changeQty(idx, delta) {
   renderOrder();
 }
 
+let lastRemovedItem = null;
+let lastRemovedIndex = null;
+let undoTimer = null;
+
 function removeItem(idx) {
   haptic('error');
+  lastRemovedItem = order[idx];
+  lastRemovedIndex = idx;
   order.splice(idx, 1);
+  renderOrder();
+  showUndoToast();
+}
+
+function showUndoToast() {
+  let toast = document.getElementById('undoToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'undoToast';
+    toast.className = 'undo-toast';
+    document.body.appendChild(toast);
+  }
+  const name = lastRemovedItem ? lastRemovedItem.name : 'Item';
+  toast.innerHTML = `<span>${name} removed</span><button onclick="undoRemove()">Undo</button>`;
+  toast.classList.add('show');
+  if (undoTimer) clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    lastRemovedItem = null;
+    lastRemovedIndex = null;
+  }, 5000);
+}
+
+function undoRemove() {
+  if (!lastRemovedItem) return;
+  haptic('light');
+  const idx = Math.min(lastRemovedIndex, order.length);
+  order.splice(idx, 0, lastRemovedItem);
+  lastRemovedItem = null;
+  lastRemovedIndex = null;
+  if (undoTimer) clearTimeout(undoTimer);
+  document.getElementById('undoToast')?.classList.remove('show');
   renderOrder();
 }
 
 function clearOrder() {
+  if (order.length === 0) return;
+  if (!confirm("Clear the entire order? This can't be undone.")) return;
   haptic('error');
   order = [];
   _prevOrderTotal = 0;
   renderOrder();
+}
+
+// ─── CART PERSISTENCE ───
+const CART_STORAGE_KEY = 'fourSeasonCart';
+function saveCart() {
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({
+      order: order,
+      orderType: orderType,
+      pickupMinutes: pickupMinutes,
+      timestamp: Date.now()
+    }));
+  } catch(e) {}
+}
+
+function loadCart() {
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    // Discard carts older than 12 hours
+    if (data.timestamp && Date.now() - data.timestamp > 12 * 60 * 60 * 1000) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      return;
+    }
+    if (Array.isArray(data.order)) order = data.order;
+    if (data.orderType) orderType = data.orderType;
+    if (typeof data.pickupMinutes === 'number') pickupMinutes = data.pickupMinutes;
+  } catch(e) {}
 }
 
 let _prevOrderTotal = 0;
@@ -1864,6 +1943,7 @@ function renderOrder() {
     showCartToast(lastItem.name);
   }
   _prevOrderTotal = currentTotal;
+  saveCart();
 
   const container = document.getElementById("orderItems");
   const isEmpty = order.length === 0;
@@ -1932,16 +2012,16 @@ function renderOrder() {
               ${customTag}
               ${hasNote ? `<div class="note-display">📝 ${item.note}</div>` : ''}
             </div>
-            <button class="remove-btn" onclick="removeItem(${idx})">×</button>
+            <button class="remove-btn" onclick="removeItem(${idx})" aria-label="Remove ${item.name}" title="Remove item">×</button>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <div class="qty-controls">
-              <button class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
-              <span class="qty-num">${item.qty}</span>
-              <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+              <button class="qty-btn" onclick="changeQty(${idx}, -1)" aria-label="Decrease quantity">−</button>
+              <span class="qty-num" aria-label="Quantity ${item.qty}">${item.qty}</span>
+              <button class="qty-btn" onclick="changeQty(${idx}, 1)" aria-label="Increase quantity">+</button>
             </div>
             <span class="row-total" style="flex:1;">${(item.sauce && item.price === 0) ? 'FREE' : fp(displayPrice * item.qty)}</span>
-            <button class="note-btn ${hasNote ? 'has-note' : ''}" title="Add note" onclick="toggleNoteRow(${idx})">📝</button>
+            <button class="note-btn ${hasNote ? 'has-note' : ''}" title="Add note" aria-label="Add note for ${item.name}" onclick="toggleNoteRow(${idx})">📝</button>
           </div>
           <div class="note-row" id="${noteRowId}">
             <textarea class="note-input" id="${noteInputId}" rows="2" placeholder="e.g. no onions, extra sauce, allergy note…" oninput="saveNote(${idx}, this.value)">${item.note || ''}</textarea>
@@ -1963,8 +2043,10 @@ function renderOrder() {
 
 function completeOrder() {
   if (order.length === 0) return;
-  haptic('success');
   const total = order.reduce((s, i) => s + i.price * i.qty, 0);
+  const count = order.reduce((s, i) => s + i.qty, 0);
+  if (!confirm(`Send this order to the kitchen?\n\n${count} item${count !== 1 ? 's' : ''} — ${fp(total)}`)) return;
+  haptic('success');
 
   document.getElementById("rOrderNum").textContent = "Order #" + orderNumber;
   document.getElementById("rOrderType").textContent = orderType;
@@ -2115,6 +2197,22 @@ document.getElementById("orderTypeToggle").addEventListener("click", function(e)
   }
 });
 
+// Escape key closes any open modal
+document.addEventListener("keydown", function(e) {
+  if (e.key !== "Escape") return;
+  const modals = [
+    { id: "spiceModal", close: () => closeSpiceModal() },
+    { id: "comboModal", close: () => closeComboModal() },
+    { id: "riceModal", close: () => closeRiceModal() },
+    { id: "sauceModal", close: () => closeSauceModal() },
+    { id: "familyModal", close: () => closeFamilyModal() },
+  ];
+  for (const m of modals) {
+    const el = document.getElementById(m.id);
+    if (el && el.classList.contains("show")) { m.close(); return; }
+  }
+});
+
 // Close modal on overlay click
 document.getElementById("spiceModal").addEventListener("click", function(e) {
   if (e.target === this) {
@@ -2222,6 +2320,11 @@ function initTheme() {
 
 // Init
 initTheme();
+loadCart();
+// Sync orderType toggle UI with loaded value
+document.querySelectorAll('#orderTypeToggle button').forEach(btn => {
+  btn.classList.toggle('active', btn.getAttribute('data-type') === orderType);
+});
 updateClock();
 renderCategories();
 renderMenuItems();

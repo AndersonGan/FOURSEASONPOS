@@ -1858,7 +1858,7 @@ function renderOrder() {
       const noteInputId = `note-input-${idx}`;
       row.innerHTML = `
         <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;">
+          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
             <div class="info" style="flex:1;min-width:0;">
               <div class="name">${item.name}</div>
               <div class="each">${eachText}</div>
@@ -1866,14 +1866,16 @@ function renderOrder() {
               ${customTag}
               ${hasNote ? `<div class="note-display">📝 ${item.note}</div>` : ''}
             </div>
+            <button class="remove-btn" onclick="removeItem(${idx})">×</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
             <div class="qty-controls">
               <button class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
               <span class="qty-num">${item.qty}</span>
               <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
             </div>
-            <span class="row-total">${(item.sauce && item.price === 0) ? 'FREE' : fp(displayPrice * item.qty)}</span>
+            <span class="row-total" style="flex:1;">${(item.sauce && item.price === 0) ? 'FREE' : fp(displayPrice * item.qty)}</span>
             <button class="note-btn ${hasNote ? 'has-note' : ''}" title="Add note" onclick="toggleNoteRow(${idx})">📝</button>
-            <button class="remove-btn" onclick="removeItem(${idx})">×</button>
           </div>
           <div class="note-row" id="${noteRowId}">
             <textarea class="note-input" id="${noteInputId}" rows="2" placeholder="e.g. no onions, extra sauce, allergy note…" oninput="saveNote(${idx}, this.value)">${item.note || ''}</textarea>

@@ -321,6 +321,40 @@
   .btn-print-kitchen { background: #c0392b; color: #fff; border: none; }
   .btn-print-kitchen:hover { background: #a93225; }
 
+  /* LUNCH CHOICE COMBO MODAL */
+  .lunch-choice-options { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; max-height: 50vh; overflow-y: auto; }
+  .lunch-choice-option { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #faf8f4; border: 2px solid #e0dcd4; border-radius: 10px; cursor: pointer; transition: all 0.1s; font-family: inherit; }
+  .lunch-choice-option:hover { border-color: #0e7c6b; background: #f0fdf4; }
+  .lunch-choice-option.selected { background: #e8f5f3; border-color: #0e7c6b; }
+  .lunch-choice-option.disabled { opacity: 0.45; cursor: not-allowed; }
+  .lunch-choice-option.disabled:hover { border-color: #e0dcd4; background: #faf8f4; }
+  .lunch-choice-checkbox { width: 22px; height: 22px; border: 2px solid #b0a895; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 14px; flex-shrink: 0; background: #fff; }
+  .lunch-choice-option.selected .lunch-choice-checkbox { background: #0e7c6b; border-color: #0e7c6b; }
+  .lunch-choice-info { flex: 1; min-width: 0; }
+  .lunch-choice-name { font-weight: 600; font-size: 15px; color: #222; }
+  .lunch-choice-note { font-size: 12px; color: #888; margin-top: 2px; }
+  .lunch-choice-upcharge { font-size: 13px; font-weight: 700; color: #c0392b; flex-shrink: 0; }
+  .pfn-toggle { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #fff; border: 1px solid #d6d1c7; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; color: #555; margin-left: 8px; flex-shrink: 0; }
+  .pfn-toggle:hover { border-color: #0e7c6b; color: #0e7c6b; }
+  .pfn-toggle.active { background: #0e7c6b; color: #fff; border-color: #0e7c6b; }
+  .lunch-choice-footer { padding: 12px 14px; background: #faf8f4; border-radius: 10px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .lunch-choice-status { font-size: 14px; font-weight: 600; color: #666; }
+  .lunch-choice-status.complete { color: #0e7c6b; }
+  .lunch-choice-status.over { color: #c0392b; }
+  .lunch-choice-total { font-size: 18px; font-weight: 800; color: #0e7c6b; }
+  .lunch-choice-note-banner { font-size: 12px; color: #c0392b; padding: 8px 12px; background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; margin-bottom: 10px; }
+  body.dark .lunch-choice-option { background: #1f1f1f; border-color: #383838; }
+  body.dark .lunch-choice-option:hover { border-color: #2ddbbf; background: #15302a; }
+  body.dark .lunch-choice-option.selected { background: #15302a; border-color: #2ddbbf; }
+  body.dark .lunch-choice-name { color: #f0f0f0; }
+  body.dark .lunch-choice-note { color: #888; }
+  body.dark .lunch-choice-checkbox { background: #2a2a2a; border-color: #555; }
+  body.dark .lunch-choice-footer { background: #262626; }
+  body.dark .lunch-choice-status { color: #aaa; }
+  body.dark .lunch-choice-total { color: #2ddbbf; }
+  body.dark .pfn-toggle { background: #2a2a2a; border-color: #555; color: #aaa; }
+  body.dark .lunch-choice-note-banner { background: #2a1818; border-color: #5a2828; color: #ff9999; }
+
   /* TABS BAR */
   .tabs-bar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: #d8d3c8; overflow-x: auto; min-height: 40px; }
   .tab-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px 6px 12px; background: #fff; border: 1px solid #c4bdae; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 600; color: #555; cursor: pointer; font-family: inherit; white-space: nowrap; transition: all 0.1s; max-width: 200px; }
@@ -610,6 +644,23 @@
   </div>
 </div>
 
+<!-- LUNCH CHOICE COMBO MODAL -->
+<div class="modal-overlay" id="lunchChoiceModal">
+  <div class="combo-modal">
+    <h3 id="lunchChoiceTitle">Choose Your Items</h3>
+    <div class="item-label" id="lunchChoiceSubtitle"></div>
+    <div id="lunchChoiceContent"></div>
+    <div class="lunch-choice-footer">
+      <div class="lunch-choice-status" id="lunchChoiceStatus"></div>
+      <div class="lunch-choice-total" id="lunchChoiceTotal"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeLunchChoiceModal()">Cancel</button>
+      <button class="btn-confirm" id="lunchChoiceConfirmBtn" onclick="confirmLunchChoice()">Add to Order</button>
+    </div>
+  </div>
+</div>
+
 <!-- RICE SELECTION MODAL -->
 <div class="modal-overlay" id="riceModal">
   <div class="spice-modal">
@@ -774,9 +825,9 @@ const menu = {
     { name: "L16. Sesame Tofu w/ Vegetable 🌶", price: 14.50, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
     { name: "L17. Mongolian Tofu w/ Vegetable", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
     { name: "L18. Home Style Tofu w/ Vegetable", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
-    { name: "Choice Combo (2 Items)", price: 12.75, section: "Choice Combinations", subtitle: "Pick 2: Pork Fried Rice, Pork Chow Mein, Spring Roll, Mar Far Chicken, Sweet & Sour Pork, BBQ Pork (+$1), Crab Meat Puffs, Chicken Chow Mein, Sweet & Sour Chicken, Fried Shrimp (+$1), Cashew Subgum Chk CM" },
-    { name: "Choice Combo (3 Items)", price: 13.75, section: "Choice Combinations", subtitle: "Pick 3: Pork Fried Rice, Pork Chow Mein, Spring Roll, Mar Far Chicken, Sweet & Sour Pork, BBQ Pork (+$1), Crab Meat Puffs, Chicken Chow Mein, Sweet & Sour Chicken, Fried Shrimp (+$1), Cashew Subgum Chk CM" },
-    { name: "Choice Combo (4 Items)", price: 14.75, section: "Choice Combinations", subtitle: "Pick 4: Pork Fried Rice, Pork Chow Mein, Spring Roll, Mar Far Chicken, Sweet & Sour Pork, BBQ Pork (+$1), Crab Meat Puffs, Chicken Chow Mein, Sweet & Sour Chicken, Fried Shrimp (+$1), Cashew Subgum Chk CM" },
+    { name: "Choice Combo (2 Items)", price: 12.75, section: "Choice Combinations", lunchChoice: true, pickCount: 2, subtitle: "Pick 2 items — tap to select" },
+    { name: "Choice Combo (3 Items)", price: 13.75, section: "Choice Combinations", lunchChoice: true, pickCount: 3, subtitle: "Pick 3 items — tap to select" },
+    { name: "Choice Combo (4 Items)", price: 14.75, section: "Choice Combinations", lunchChoice: true, pickCount: 4, subtitle: "Pick 4 items — tap to select" },
     { name: "Shrimp Lo Mein", price: 16.25, section: "Lo Mein or Chow Mein", subtitle: "Served with soft noodles" },
     { name: "Beef, Chicken or BBQ Pork Lo Mein", price: 14.75, section: "Lo Mein or Chow Mein", subtitle: "Served with soft noodles" },
     { name: "Vegetable Lo Mein", price: 14.00, section: "Lo Mein or Chow Mein", subtitle: "Served with soft noodles" },
@@ -1133,6 +1184,27 @@ const SAUCE_SIZES = [
 let pendingSauceItem = null;
 let selectedSauceSize = null;
 
+// Lunch Choice Combo state
+// upcharge: extra dollars added per selection.
+// pfnEligible: chow mein items where Pan Fried Noodles substitution applies (+$2)
+const LUNCH_CHOICE_OPTIONS = [
+  { name: "Pork Fried Rice", upcharge: 0 },
+  { name: "Pork Chow Mein", upcharge: 0, note: "w/ Crunchy Noodles", pfnEligible: true },
+  { name: "Spring Roll", upcharge: 0 },
+  { name: "Mar Far Chicken", upcharge: 0 },
+  { name: "Sweet & Sour Pork", upcharge: 0 },
+  { name: "BBQ Pork", upcharge: 1.00 },
+  { name: "Crab Meat Puffs", upcharge: 0 },
+  { name: "Chicken Chow Mein", upcharge: 0, note: "w/ Crunchy Noodles", pfnEligible: true },
+  { name: "Sweet & Sour Chicken", upcharge: 0 },
+  { name: "Fried Shrimp", upcharge: 1.00 },
+  { name: "Cashew Subgum Chicken Chow Mein", upcharge: 0, note: "w/ Crunchy Noodles", pfnEligible: true },
+];
+const PAN_FRIED_NOODLE_UPCHARGE = 2.00;
+let pendingLunchChoice = null; // the combo item (with pickCount)
+let lunchChoiceSelections = []; // array of { optionIdx, panFried }
+
+
 // Pickup time state
 let pickupMinutes = 10;
 function changePickupTime(delta) {
@@ -1211,6 +1283,95 @@ function renderCategories() {
   });
 }
 
+// ─── FUZZY SEARCH ───
+// Levenshtein edit distance — number of single-character edits (insertions, deletions, substitutions)
+// needed to transform `a` into `b`. Used for typo-tolerant search.
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const aLen = a.length, bLen = b.length;
+  if (aLen === 0) return bLen;
+  if (bLen === 0) return aLen;
+  // Only allocate two rows; we don't need the full matrix
+  let prev = new Array(bLen + 1);
+  let curr = new Array(bLen + 1);
+  for (let j = 0; j <= bLen; j++) prev[j] = j;
+  for (let i = 1; i <= aLen; i++) {
+    curr[0] = i;
+    const aCh = a.charCodeAt(i - 1);
+    for (let j = 1; j <= bLen; j++) {
+      const cost = aCh === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(
+        curr[j - 1] + 1,       // insertion
+        prev[j] + 1,           // deletion
+        prev[j - 1] + cost     // substitution
+      );
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[bLen];
+}
+
+// Tolerance scales with word length: short words tolerate fewer typos than long ones.
+// Examples: "beef" (4) → tolerance 1, "mongolian" (9) → tolerance 2, "chicken" (7) → tolerance 2.
+function fuzzyTolerance(wordLen) {
+  if (wordLen <= 3) return 0;
+  if (wordLen <= 5) return 1;
+  if (wordLen <= 8) return 2;
+  return 3;
+}
+
+// Score a search query against an item.
+// Returns:
+//   null = no match
+//   0    = exact substring match (best)
+//   1+   = fuzzy match; lower score = better (sum of edit distances)
+function scoreSearchMatch(rawSearch, searchNorm, item) {
+  const nameLower = item.name.toLowerCase();
+  const nameNorm = nameLower.replace(/[^a-z0-9]/g, "");
+  const subtitleLower = (item.subtitle || "").toLowerCase();
+  const subtitleNorm = subtitleLower.replace(/[^a-z0-9]/g, "");
+  
+  // Tier 0: substring match (case-insensitive, with and without punctuation)
+  if (nameLower.includes(rawSearch) || nameNorm.includes(searchNorm)) return 0;
+  if (subtitleLower.includes(rawSearch) || subtitleNorm.includes(searchNorm)) return 0;
+  
+  // Tier 1+: fuzzy match. Split query into words; each query word must
+  // match (within edit-distance tolerance) at least one word in item name/subtitle.
+  const queryWords = rawSearch.split(/\s+/).filter(w => w.length > 0);
+  if (queryWords.length === 0) return null;
+  
+  // Pool of words to match against — name first, then subtitle
+  const itemWords = (nameLower + " " + subtitleLower)
+    .split(/[^a-z0-9]+/)
+    .filter(w => w.length > 0);
+  if (itemWords.length === 0) return null;
+  
+  let totalScore = 0;
+  for (const qWord of queryWords) {
+    const tolerance = fuzzyTolerance(qWord.length);
+    let bestDist = Infinity;
+    for (const iWord of itemWords) {
+      // Quick reject: if length difference exceeds tolerance, can't match
+      if (Math.abs(iWord.length - qWord.length) > tolerance) {
+        // BUT also allow prefix match for partial typing ("mong" → "mongolian")
+        if (qWord.length >= 3 && iWord.startsWith(qWord)) {
+          bestDist = 0;
+          break;
+        }
+        continue;
+      }
+      const d = levenshtein(qWord, iWord);
+      if (d < bestDist) bestDist = d;
+      if (bestDist === 0) break;
+    }
+    if (bestDist > tolerance) return null; // this query word doesn't match anything
+    totalScore += bestDist;
+  }
+  // Fuzzy results get a +1 baseline so exact substrings always rank first
+  return totalScore + 1;
+}
+
+
 function renderMenuItems() {
   const grid = document.getElementById("menuGrid");
   grid.innerHTML = "";
@@ -1221,28 +1382,50 @@ function renderMenuItems() {
   
   // If searching, show results across all categories
   if (searchTerm.length > 0) {
-    let resultCount = 0;
+    // Score every item: 0 = exact substring, 1+ = fuzzy edit distance
+    const scored = [];
     Object.keys(menu).forEach(cat => {
-      const matches = menu[cat].filter(item => {
-        const nameMatch = item.name.toLowerCase().includes(searchTerm) || normalize(item.name).includes(searchNorm);
-        const subtitleMatch = item.subtitle && (item.subtitle.toLowerCase().includes(searchTerm) || normalize(item.subtitle).includes(searchNorm));
-        return nameMatch || subtitleMatch;
-      });
-      if (matches.length === 0) return;
-      
-      // Category header
-      const header = document.createElement("div");
-      header.className = "menu-section-header";
-      header.textContent = cat;
-      grid.appendChild(header);
-      
-      matches.forEach(item => {
-        resultCount++;
-        renderMenuItem(grid, item, cat);
+      menu[cat].forEach(item => {
+        const score = scoreSearchMatch(searchTerm, searchNorm, item);
+        if (score !== null) {
+          scored.push({ item, cat, score });
+        }
       });
     });
     
-    if (resultCount === 0) {
+    // Sort by score (lower = better), then by category order
+    const catOrder = Object.keys(menu);
+    scored.sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      return catOrder.indexOf(a.cat) - catOrder.indexOf(b.cat);
+    });
+    
+    // Group consecutive results by category, preserving sorted order
+    let lastCat = null;
+    let didYouMeanShown = false;
+    scored.forEach(({ item, cat, score }) => {
+      // Show "Did you mean?" header above the first fuzzy-only result
+      if (!didYouMeanShown && score >= 1) {
+        const hdr = document.createElement("div");
+        hdr.className = "menu-section-header";
+        hdr.style.color = "#888";
+        hdr.style.fontStyle = "italic";
+        hdr.textContent = scored.some(s => s.score === 0) ? "Similar items" : "Did you mean…";
+        grid.appendChild(hdr);
+        didYouMeanShown = true;
+        lastCat = null; // force re-print of cat below
+      }
+      if (cat !== lastCat) {
+        const header = document.createElement("div");
+        header.className = "menu-section-header";
+        header.textContent = cat;
+        grid.appendChild(header);
+        lastCat = cat;
+      }
+      renderMenuItem(grid, item, cat);
+    });
+    
+    if (scored.length === 0) {
       const empty = document.createElement("div");
       empty.className = "search-results-label";
       empty.textContent = "No items found";
@@ -1427,6 +1610,12 @@ function addItemToOrder(item) {
   // Handle Family Style items - open family style modal
   if (item.familyStyle) {
     showFamilyModal(item);
+    return;
+  }
+  
+  // Handle Lunch Choice Combo items
+  if (item.lunchChoice) {
+    showLunchChoiceModal(item);
     return;
   }
   
@@ -1636,6 +1825,180 @@ function closeComboModal() {
   pendingComboItem = null;
   comboCustomizations = {};
   selectedComboSpiceLevel = "Medium"; // Reset to default
+}
+
+// ─── LUNCH CHOICE COMBO ───
+function showLunchChoiceModal(item) {
+  pendingLunchChoice = { ...item };
+  lunchChoiceSelections = [];
+  
+  document.getElementById("lunchChoiceTitle").textContent = `Pick ${item.pickCount} Items`;
+  document.getElementById("lunchChoiceSubtitle").textContent = `${item.name} — ${fp(item.price)}`;
+  
+  const content = document.getElementById("lunchChoiceContent");
+  const noteBanner = '<div class="lunch-choice-note-banner">💡 Pan Fried Noodles available for chow mein items (+$2.00 each)</div>';
+  
+  const optionsHTML = LUNCH_CHOICE_OPTIONS.map((opt, idx) => {
+    const upchargeText = opt.upcharge > 0 ? `<span class="lunch-choice-upcharge">+${fp(opt.upcharge)}</span>` : '';
+    const noteText = opt.note ? `<div class="lunch-choice-note">${opt.note}</div>` : '';
+    const pfnBtn = opt.pfnEligible ? `<button class="pfn-toggle" id="pfnBtn${idx}" onclick="event.stopPropagation();togglePanFried(${idx})" title="Substitute Pan Fried Noodles (+$2.00)">🍜 PFN +$2</button>` : '';
+    return `
+      <div class="lunch-choice-option" id="lcOpt${idx}" onclick="toggleLunchChoice(${idx})">
+        <div class="lunch-choice-checkbox" id="lcCheck${idx}"></div>
+        <div class="lunch-choice-info">
+          <div class="lunch-choice-name">${opt.name}</div>
+          ${noteText}
+        </div>
+        ${upchargeText}
+        ${pfnBtn}
+      </div>
+    `;
+  }).join('');
+  
+  content.innerHTML = `${noteBanner}<div class="lunch-choice-options">${optionsHTML}</div>`;
+  
+  updateLunchChoiceFooter();
+  document.getElementById("lunchChoiceModal").classList.add("show");
+}
+
+function toggleLunchChoice(idx) {
+  haptic('light');
+  const existing = lunchChoiceSelections.findIndex(s => s.optionIdx === idx);
+  if (existing >= 0) {
+    lunchChoiceSelections.splice(existing, 1);
+  } else {
+    if (lunchChoiceSelections.length >= pendingLunchChoice.pickCount) {
+      // Limit reached — give feedback but don't block (let user deselect first)
+      haptic('error');
+      return;
+    }
+    lunchChoiceSelections.push({ optionIdx: idx, panFried: false });
+  }
+  updateLunchChoiceUI();
+}
+
+function togglePanFried(idx) {
+  // PFN only applies if the item is selected
+  const sel = lunchChoiceSelections.find(s => s.optionIdx === idx);
+  if (!sel) {
+    // Not selected — select it first AND turn on PFN
+    if (lunchChoiceSelections.length >= pendingLunchChoice.pickCount) {
+      haptic('error');
+      return;
+    }
+    haptic('light');
+    lunchChoiceSelections.push({ optionIdx: idx, panFried: true });
+  } else {
+    haptic('light');
+    sel.panFried = !sel.panFried;
+  }
+  updateLunchChoiceUI();
+}
+
+function updateLunchChoiceUI() {
+  // Update visual selected/checkbox state
+  LUNCH_CHOICE_OPTIONS.forEach((_, idx) => {
+    const sel = lunchChoiceSelections.find(s => s.optionIdx === idx);
+    const optEl = document.getElementById(`lcOpt${idx}`);
+    const checkEl = document.getElementById(`lcCheck${idx}`);
+    const pfnEl = document.getElementById(`pfnBtn${idx}`);
+    if (!optEl) return;
+    if (sel) {
+      optEl.classList.add("selected");
+      checkEl.textContent = "✓";
+    } else {
+      optEl.classList.remove("selected");
+      checkEl.textContent = "";
+    }
+    if (pfnEl) {
+      if (sel && sel.panFried) pfnEl.classList.add("active");
+      else pfnEl.classList.remove("active");
+    }
+    // Grey out unselected options if limit reached
+    const limitReached = lunchChoiceSelections.length >= pendingLunchChoice.pickCount;
+    if (!sel && limitReached) {
+      optEl.classList.add("disabled");
+    } else {
+      optEl.classList.remove("disabled");
+    }
+  });
+  updateLunchChoiceFooter();
+}
+
+function updateLunchChoiceFooter() {
+  if (!pendingLunchChoice) return;
+  const need = pendingLunchChoice.pickCount;
+  const have = lunchChoiceSelections.length;
+  const statusEl = document.getElementById("lunchChoiceStatus");
+  const totalEl = document.getElementById("lunchChoiceTotal");
+  const confirmBtn = document.getElementById("lunchChoiceConfirmBtn");
+  
+  const upchargeTotal = lunchChoiceSelections.reduce((sum, sel) => {
+    const opt = LUNCH_CHOICE_OPTIONS[sel.optionIdx];
+    return sum + (opt.upcharge || 0) + (sel.panFried ? PAN_FRIED_NOODLE_UPCHARGE : 0);
+  }, 0);
+  const finalTotal = pendingLunchChoice.price + upchargeTotal;
+  
+  if (have < need) {
+    statusEl.textContent = `Select ${need - have} more`;
+    statusEl.className = "lunch-choice-status";
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = "0.5";
+    confirmBtn.style.cursor = "not-allowed";
+  } else {
+    statusEl.textContent = `✓ ${have} of ${need} selected`;
+    statusEl.className = "lunch-choice-status complete";
+    confirmBtn.disabled = false;
+    confirmBtn.style.opacity = "1";
+    confirmBtn.style.cursor = "pointer";
+  }
+  totalEl.textContent = fp(finalTotal);
+}
+
+function confirmLunchChoice() {
+  if (!pendingLunchChoice) return;
+  if (lunchChoiceSelections.length !== pendingLunchChoice.pickCount) return;
+  haptic('heavy');
+  
+  const upchargeTotal = lunchChoiceSelections.reduce((sum, sel) => {
+    const opt = LUNCH_CHOICE_OPTIONS[sel.optionIdx];
+    return sum + (opt.upcharge || 0) + (sel.panFried ? PAN_FRIED_NOODLE_UPCHARGE : 0);
+  }, 0);
+  const finalPrice = pendingLunchChoice.price + upchargeTotal;
+  
+  // Build a summary string of selections
+  const summaryParts = lunchChoiceSelections.map(sel => {
+    const opt = LUNCH_CHOICE_OPTIONS[sel.optionIdx];
+    let s = opt.name;
+    const extras = [];
+    if (opt.upcharge > 0) extras.push(`+${fp(opt.upcharge)}`);
+    if (sel.panFried) extras.push(`Pan Fried +${fp(PAN_FRIED_NOODLE_UPCHARGE)}`);
+    if (extras.length) s += ` (${extras.join(', ')})`;
+    return s;
+  });
+  const customizationSummary = "Includes: " + summaryParts.join(' · ');
+  
+  const orderItem = {
+    name: pendingLunchChoice.name,
+    price: finalPrice,
+    basePrice: pendingLunchChoice.price,
+    qty: 1,
+    category: activeCategory,
+    lunchChoice: true,
+    pickCount: pendingLunchChoice.pickCount,
+    lunchChoiceSelections: lunchChoiceSelections.map(s => ({ ...s })),
+    customizationSummary: customizationSummary,
+  };
+  
+  order.push(orderItem);
+  closeLunchChoiceModal();
+  renderOrder();
+}
+
+function closeLunchChoiceModal() {
+  document.getElementById("lunchChoiceModal").classList.remove("show");
+  pendingLunchChoice = null;
+  lunchChoiceSelections = [];
 }
 
 function selectSpice(level) {
@@ -3082,7 +3445,7 @@ document.addEventListener("keydown", function(e) {
   const tag = (e.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
   // Ignore if any modal is open
-  const anyModalOpen = ["spiceModal","comboModal","riceModal","sauceModal","familyModal","historyOverlay"].some(id => {
+  const anyModalOpen = ["spiceModal","comboModal","lunchChoiceModal","riceModal","sauceModal","familyModal","historyOverlay"].some(id => {
     const el = document.getElementById(id);
     return el && el.classList.contains("show");
   });
@@ -3145,6 +3508,7 @@ document.addEventListener("keydown", function(e) {
   const modals = [
     { id: "spiceModal", close: () => closeSpiceModal() },
     { id: "comboModal", close: () => closeComboModal() },
+    { id: "lunchChoiceModal", close: () => closeLunchChoiceModal() },
     { id: "riceModal", close: () => closeRiceModal() },
     { id: "sauceModal", close: () => closeSauceModal() },
     { id: "familyModal", close: () => closeFamilyModal() },
@@ -3183,6 +3547,12 @@ document.getElementById("sauceModal").addEventListener("click", function(e) {
 document.getElementById("familyModal").addEventListener("click", function(e) {
   if (e.target === this) {
     closeFamilyModal();
+  }
+});
+
+document.getElementById("lunchChoiceModal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    closeLunchChoiceModal();
   }
 });
 

@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Four Season POS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif; background: #f5f0e8; color: #333; overflow: hidden; height: 100vh; height: 100dvh; }
+
+  .app { display: flex; height: 100vh; height: 100dvh; width: 100%; }
+
+  /* LEFT SIDE */
+  .menu-side { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: #0e7c6b; color: #fff; flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
+  .top-bar .brand { display: flex; align-items: center; gap: 10px; }
+  .top-bar .brand svg { flex-shrink: 0; }
+  .top-bar .brand-name { font-weight: 800; font-size: 16px; letter-spacing: 0.5px; }
+  .top-bar .brand-sub { font-weight: 500; font-size: 16px; opacity: 0.75; }
+  .top-bar .right { display: flex; align-items: center; gap: 16px; }
+  .top-bar .datetime { font-size: 13px; opacity: 0.75; white-space: nowrap; }
+
+  .order-type-toggle { display: flex; background: rgba(255,255,255,0.15); border-radius: 6px; overflow: hidden; }
+  .order-type-toggle button { padding: 5px 14px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; background: transparent; color: rgba(255,255,255,0.85); font-family: inherit; transition: all 0.15s; }
+  .order-type-toggle button.active { background: #fff; color: #0e7c6b; }
+
+  .cat-bar { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; padding: 14px 20px; background: #f5f0e8; flex-shrink: 0; }
+  .cat-btn { padding: 12px 10px; border-radius: 10px; border: 1px solid #ccc; background: #fff; color: #666; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.04); text-align: center; }
+  .cat-btn.active { border: none; background: #0e7c6b; color: #fff; box-shadow: none; }
+
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; padding: 8px 20px 20px; overflow-y: auto; flex: 1; min-height: 0; align-content: start; }
+  .menu-item { display: flex; flex-direction: column; justify-content: center; padding: 18px 20px; background: #fff; border-radius: 12px; border: 1px solid #e0dcd4; cursor: pointer; text-align: left; color: #333; min-height: 80px; font-family: inherit; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.1s; overflow: hidden; }
+  .menu-item:active { transform: scale(0.97); }
+  .menu-item .item-name { font-weight: 600; font-size: 17px; margin-bottom: 6px; line-height: 1.3; color: #222; overflow-wrap: break-word; }
+  .menu-item .item-price { font-weight: 700; color: #0e7c6b; font-size: 17px; }
+  .menu-item .item-subtitle { font-size: 13px; color: #999; margin-top: 4px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .menu-section-header { grid-column: 1 / -1; padding: 10px 4px 6px; font-size: 16px; font-weight: 700; color: #0e7c6b; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 2px solid #d6ece8; margin-top: 4px; }
+
+  /* SEARCH BAR */
+  .search-bar { display: flex; align-items: center; padding: 0 20px 10px; background: #f5f0e8; flex-shrink: 0; gap: 10px; }
+  .search-bar .search-icon { flex-shrink: 0; }
+  .search-bar input { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1px solid #d6d1c7; background: #fff; font-size: 16px; font-weight: 500; font-family: inherit; color: #222; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .search-bar input:focus { outline: none; border-color: #0e7c6b; box-shadow: 0 0 0 2px rgba(14,124,107,0.2); }
+  .search-bar input::placeholder { color: #b5ae9f; }
+  .search-clear { display: none; width: 32px; height: 32px; border-radius: 50%; border: none; background: #e0dcd4; color: #888; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; flex-shrink: 0; line-height: 1; }
+  .search-clear.show { display: flex; align-items: center; justify-content: center; }
+  .search-results-label { grid-column: 1 / -1; padding: 8px 4px 4px; font-size: 13px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+  .order-side { width: 310px; min-width: 270px; display: flex; flex-direction: column; background: #fff; border-left: 1px solid #e0dcd4; flex-shrink: 0; }
+
+  .order-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
+  .order-header h2 { font-weight: 800; font-size: 22px; color: #222; }
+  .clear-btn { padding: 5px 16px; border-radius: 20px; border: 1.5px solid #c0392b; background: transparent; color: #c0392b; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; display: none; }
+  .clear-btn.show { display: inline-block; }
+
+  .dine-in-info { display: none; padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #bbf7d0; gap: 12px; }
+  .dine-in-info.show { display: flex; }
+
+  .pickup-info { display: none; padding: 18px 20px; background: #fef9ec; border-bottom: 1px solid #fde68a; flex-direction: column; align-items: center; gap: 10px; }
+  .pickup-info.show { display: flex; }
+  .pickup-label { font-size: 18px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 1px; }
+  .pickup-time-display { font-size: 68px; font-weight: 900; color: #222; line-height: 1; }
+  .pickup-controls { display: flex; align-items: center; gap: 8px; }
+  .pickup-btn { padding: 10px 16px; border-radius: 10px; border: 1px solid #e0dcd4; background: #fff; color: #333; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; min-width: 64px; text-align: center; }
+  .pickup-btn:active { transform: scale(0.95); background: #f5f0e8; }
+  .pickup-btn.minus { color: #c0392b; border-color: #fecaca; }
+  .pickup-btn.plus { color: #0e7c6b; border-color: #a7f3d0; }
+  .dine-in-field { flex: 1; }
+  .dine-in-field label { display: block; font-size: 11px; font-weight: 600; color: #166534; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .dine-in-field input { width: 100%; padding: 8px 12px; border: 1px solid #86efac; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: inherit; background: #fff; color: #222; text-align: center; }
+  .dine-in-field input:focus { outline: none; border-color: #0e7c6b; box-shadow: 0 0 0 2px rgba(14,124,107,0.2); }
+  .dine-in-field input::placeholder { color: #aaa; font-weight: 400; }
+
+  .order-items { flex: 1; overflow-y: auto; padding: 4px 16px; }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #c0b9ad; gap: 12px; }
+  .empty-state span { font-size: 16px; text-align: center; line-height: 1.5; }
+
+  .order-row { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid #f0ece4; }
+  .order-row .info { flex: 1; min-width: 0; }
+  .order-row .info .name { font-size: 18.7px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .order-row .info .each { font-size: 15.4px; color: #aaa; margin-top: 2px; }
+  .order-row .info .spice-tag { display: inline-block; font-size: 13.2px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-top: 3px; }
+  .order-row .info .spice-tag.mild { background: #fef3c7; color: #92400e; }
+  .order-row .info .spice-tag.medium { background: #fed7aa; color: #c2410c; }
+  .order-row .info .spice-tag.spicy { background: #fecaca; color: #dc2626; }
+  .order-row .info .spice-tag.ex-spicy { background: #dc2626; color: #fff; }
+  .order-row .info .rice-tag { display: inline-block; font-size: 13.2px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-top: 3px; margin-left: 4px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  .order-row .info .custom-tag { display: block; font-size: 13.2px; color: #666; margin-top: 4px; font-style: italic; line-height: 1.4; }
+  .qty-controls { display: flex; align-items: center; gap: 2px; }
+  .qty-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e0dcd4; background: #faf8f4; color: #0e7c6b; font-size: 20px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+  .qty-num { font-weight: 700; font-size: 19.8px; min-width: 26px; text-align: center; color: #222; }
+  .row-total { font-weight: 700; font-size: 18.7px; min-width: 50px; text-align: right; color: #0e7c6b; }
+  .remove-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 22px; padding: 0 4px; line-height: 1; }
+
+  .order-footer { padding: 16px 20px 20px; padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)); border-top: 1px solid #eee; background: #fdfbf6; }
+  .order-meta { display: flex; justify-content: space-between; font-size: 14px; color: #aaa; margin-bottom: 10px; }
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .total-label { font-size: 20px; font-weight: 800; color: #222; letter-spacing: 0.5px; }
+  .total-amount { font-size: 32px; font-weight: 800; color: #c0392b; }
+  .print-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #e8e3da; color: #b5ae9f; font-size: 17px; font-weight: 700; cursor: default; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; transition: all 0.15s; }
+  .print-btn.enabled { background: #0e7c6b; color: #fff; cursor: pointer; }
+
+  /* SPICE LEVEL MODAL */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.show { display: flex; }
+  .spice-modal { background: #fff; border-radius: 16px; padding: 24px; max-width: 340px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: modalPop 0.2s ease-out; }
+  @keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .spice-modal h3 { font-size: 18px; font-weight: 800; color: #222; margin-bottom: 6px; text-align: center; }
+  .spice-modal .item-label { font-size: 14px; color: #666; text-align: center; margin-bottom: 20px; }
+  .spice-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .spice-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 2px solid #e0dcd4; background: #faf8f4; cursor: pointer; transition: all 0.15s; }
+  .spice-option:hover { border-color: #0e7c6b; }
+  .spice-option.selected { border-color: #0e7c6b; background: #e8f5f3; }
+  .spice-option .spice-icon { font-size: 20px; width: 32px; text-align: center; }
+  .spice-option .spice-info { flex: 1; }
+  .spice-option .spice-name { font-weight: 700; font-size: 15px; color: #222; }
+  .spice-option .spice-desc { font-size: 12px; color: #888; margin-top: 2px; }
+  .spice-option .checkmark { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .spice-option.selected .checkmark { background: #0e7c6b; border-color: #0e7c6b; }
+  .spice-option.selected .checkmark::after { content: "✓"; color: #fff; font-size: 12px; font-weight: 700; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions button { flex: 1; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .btn-cancel { border: 2px solid #ccc; background: #fff; color: #666; }
+  .btn-confirm { border: none; background: #0e7c6b; color: #fff; }
+  .btn-confirm:disabled { background: #ccc; cursor: not-allowed; }
+
+  /* COMBO CUSTOMIZATION MODAL */
+  .combo-modal { background: #fff; border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: modalPop 0.2s ease-out; }
+  .combo-modal h3 { font-size: 18px; font-weight: 800; color: #222; margin-bottom: 6px; text-align: center; }
+  .combo-modal .item-label { font-size: 14px; color: #666; text-align: center; margin-bottom: 20px; }
+  .combo-section { margin-bottom: 20px; }
+  .combo-section-title { font-size: 13px; font-weight: 700; color: #0e7c6b; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .combo-item-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: #f9f7f4; margin-bottom: 8px; }
+  .combo-item-row .item-info { flex: 1; }
+  .combo-item-row .item-name { font-size: 14px; font-weight: 600; color: #222; }
+  .combo-item-row .item-original { font-size: 11px; color: #999; margin-top: 2px; }
+  .combo-item-row select { padding: 8px 12px; border: 1px solid #e0dcd4; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: inherit; background: #fff; color: #222; cursor: pointer; }
+  .combo-item-row select:focus { outline: none; border-color: #0e7c6b; }
+  .remove-item-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #e74c3c; background: #fff; color: #e74c3c; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .remove-item-btn:hover { background: #e74c3c; color: #fff; }
+  .remove-item-btn.removed { background: #e0dcd4; color: #999; border-color: #e0dcd4; }
+
+  /* RECEIPT PAGE */
+  body.receipt-open { overflow: auto; height: auto; }
+  .receipt-page { display: none; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; min-height: 100dvh; background: #e8e3da; padding: 30px 20px 60px; overflow-y: auto; box-sizing: border-box; -webkit-overflow-scrolling: touch; }
+  .receipt-page.show { display: flex; }
+  .receipt-card { background: #fff; border-radius: 0; padding: 90px 120px; width: 100vw; max-width: 2200px; min-width: 440px; font-family: 'Courier New', monospace; box-shadow: 0 2px 16px rgba(0,0,0,0.15); position: relative; -webkit-text-stroke: 1px #000; color: #000; }
+  .receipt-card::after { content: ''; position: absolute; bottom: -14px; left: 0; right: 0; height: 14px; background: linear-gradient(135deg, #fff 33.33%, transparent 33.33%), linear-gradient(-135deg, #fff 33.33%, transparent 33.33%); background-size: 16px 14px; }
+  .receipt-card .r-header { text-align: center; margin-bottom: 52px; }
+  .receipt-card .r-name { font-size: 120px; font-weight: 900; color: #000; letter-spacing: 5px; -webkit-text-stroke: 3px #000; }
+  .receipt-card .r-sub { font-size: 72px; font-weight: 900; color: #000; margin-top: 8px; -webkit-text-stroke: 2px #000; }
+  .receipt-card .r-addr { font-size: 54px; color: #000; margin-top: 14px; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .r-divider { border-top: 3px dashed #000; margin: 38px 0; }
+  .r-divider.thick { border-top: 4px dashed #000; margin: 46px 0; }
+  .r-meta { display: flex; justify-content: space-between; font-size: 58px; margin-bottom: 14px; color: #000; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .r-table-info { display: flex; justify-content: space-between; font-size: 58px; font-weight: 900; margin-bottom: 16px; color: #000; -webkit-text-stroke: 1.5px #000; }
+  .r-pickup-info { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 30px; padding: 38px 0; text-align: center; width: 100%; }
+  .r-pickup-label { font-size: 66px; font-weight: 900; color: #000; text-transform: uppercase; letter-spacing: 1px; -webkit-text-stroke: 2px #000; text-align: center; width: 100%; }
+  .r-pickup-time { font-size: 130px; font-weight: 900; color: #000; line-height: 1.1; -webkit-text-stroke: 3px #000; text-align: center; width: 100%; white-space: nowrap; }
+  .r-pickup-minutes { font-size: 60px; font-weight: 900; color: #000; text-align: center; width: 100%; white-space: nowrap; -webkit-text-stroke: 1.5px #000; }
+  .r-time { font-size: 54px; color: #000; margin-bottom: 28px; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .r-item { display: flex; justify-content: space-between; padding: 24px 0; font-size: 64px; font-weight: 900; color: #000; -webkit-text-stroke: 1.5px #000; }
+  .r-item .r-qty { font-weight: 900; }
+  .r-item .r-price { font-weight: 900; white-space: nowrap; margin-left: 24px; }
+  .r-item .r-spice { font-size: 56px; color: #000; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .r-item .r-custom { font-size: 52px; color: #000; font-style: italic; display: block; margin-top: 10px; margin-left: 42px; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .r-total { display: flex; justify-content: space-between; font-size: 96px; font-weight: 900; padding: 14px 0; -webkit-text-stroke: 3px #000; }
+  .r-total .r-total-amt { color: #000; }
+  .r-footer { text-align: center; font-size: 54px; color: #000; margin-top: 22px; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+
+  .r-tip-section { padding: 24px 0; }
+  .r-tip-title { font-size: 64px; font-weight: 900; text-align: center; margin-bottom: 28px; color: #000; text-transform: uppercase; letter-spacing: 1px; -webkit-text-stroke: 2px #000; }
+  .r-tip-row { display: flex; justify-content: space-between; font-size: 60px; padding: 16px 0; color: #000; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .r-tip-row span:first-child { font-weight: 900; min-width: 58px; }
+  .r-tip-row span:nth-child(2) { color: #000; flex: 1; text-align: center; }
+  .r-tip-row.r-tip-header { font-size: 42px; font-weight: 900; color: #000; text-transform: uppercase; letter-spacing: 1px; padding: 8px 0 4px; border-bottom: none; -webkit-text-stroke: 1px #000; }
+  .r-tip-row.r-tip-header span:first-child { color: #000; }
+  .r-tip-row.r-tip-header span:nth-child(2) { color: #000; }
+  .r-tip-row.r-tip-header .r-tip-total { color: #000; font-weight: 900; }
+  .r-tip-total { font-weight: 900; color: #000; }
+  .r-tip-line { border-top: 3px dotted #000; margin: 20px 0; }
+  .r-tip-custom { color: #000; font-size: 60px; font-weight: 900; -webkit-text-stroke: 1.5px #000; }
+  .receipt-actions { display: flex; gap: 20px; margin-top: 48px; width: 100vw; max-width: 2200px; min-width: 440px; justify-content: center; }
+  .receipt-actions button { padding: 28px 56px; border-radius: 16px; font-size: 30px; font-weight: 800; cursor: pointer; font-family: inherit; flex: 1; }
+  .btn-print-receipt { border: 2px solid #0e7c6b; background: #fff; color: #0e7c6b; }
+  .btn-new-order { border: none; background: #0e7c6b; color: #fff; }
+  .btn-back-order { border: 2px solid #b8860b; background: #fff; color: #b8860b; }
+
+  /* SAUCE TAG */
+  .order-row .info .sauce-tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-top: 3px; }
+  .sauce-tag.paid { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .sauce-tag.free { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+
+  /* MOBILE CART TOGGLE */
+  .mobile-cart-toggle { display: none; position: fixed; bottom: 20px; right: 20px; z-index: 900; width: 60px; height: 60px; border-radius: 50%; background: #0e7c6b; color: #fff; border: none; box-shadow: 0 4px 16px rgba(14,124,107,0.4); font-size: 22px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .mobile-cart-toggle .cart-badge { position: absolute; top: -2px; right: -2px; background: #c0392b; color: #fff; font-size: 11px; font-weight: 800; min-width: 22px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+  .mobile-cart-toggle .cart-badge:empty { display: none; }
+
+  .mobile-back-btn { display: none; padding: 10px 18px; background: #0e7c6b; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; margin: 10px 16px; }
+
+  /* CART TOAST */
+  .cart-toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: #222; color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 13px; font-weight: 600; font-family: inherit; box-shadow: 0 4px 20px rgba(0,0,0,0.25); z-index: 950; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; white-space: nowrap; max-width: 85vw; overflow: hidden; text-overflow: ellipsis; display: none; }
+  .cart-toast.show { display: block; opacity: 1; transform: translateX(-50%) translateY(0); }
+  .cart-toast .toast-check { color: #34d399; margin-right: 6px; }
+
+  @media (max-width: 700px) {
+    body { overflow: auto; height: auto; min-height: 100vh; min-height: -webkit-fill-available; }
+    .app { flex-direction: column; height: auto; min-height: 100vh; min-height: -webkit-fill-available; overflow: visible; }
+    .menu-side { flex: none; height: auto; min-height: 0; overflow: visible; }
+    .menu-side.mobile-hidden { display: none; }
+    .order-side { width: 100%; min-width: unset; height: auto; min-height: 100vh; border-left: none; border-top: none; display: none; flex-shrink: 0; }
+    .order-side.mobile-show { display: flex; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: 100%; height: 100dvh; overflow: hidden; z-index: 100; }
+
+    .top-bar { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
+    .top-bar .right { display: flex; flex-wrap: wrap; gap: 8px; }
+    .top-bar .datetime { display: none; }
+
+    .cat-bar { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .cat-btn { padding: 11px 8px; font-size: 13px; }
+
+    .menu-grid { flex: none; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 8px 14px 90px; overflow-y: visible; height: auto; }
+    .menu-item { padding: 16px 14px; min-height: 72px; }
+    .menu-item .item-name { font-size: 16px; }
+    .menu-item .item-price { font-size: 16px; }
+    .menu-item .item-subtitle { font-size: 12px; }
+
+    .search-bar { padding: 0 14px 8px; }
+    .search-bar input { padding: 10px 14px; font-size: 15px; }
+
+    .mobile-cart-toggle { display: flex; align-items: center; justify-content: center; }
+    .mobile-back-btn { display: block; }
+
+    .order-header { padding: 12px 16px; }
+    .order-items { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
+    .order-footer { flex-shrink: 0; padding: 14px 16px; padding-bottom: max(80px, calc(env(safe-area-inset-bottom, 0px) + 70px)); }
+    .total-amount { font-size: 24px; }
+    .print-btn { padding: 12px; font-size: 14px; }
+
+    .modal-overlay { padding: 10px; align-items: flex-start; padding-top: 40px; }
+    .spice-modal { max-width: 100%; padding: 20px 16px; max-height: 85vh; overflow-y: auto; }
+    .combo-modal { max-width: 100%; padding: 20px 16px; max-height: 90vh; }
+
+    .receipt-page { padding: 16px; min-height: 100vh; min-height: 100dvh; height: auto; overflow: auto; justify-content: flex-start; }
+    .receipt-card { padding: 36px 24px; width: 96vw; max-width: 96vw; min-width: unset; }
+    .receipt-actions { width: 96vw; max-width: 96vw; min-width: unset; flex-wrap: wrap; }
+    .receipt-actions button { padding: 14px 16px; font-size: 16px; }
+
+    .dine-in-info { padding: 10px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="mainView">
+  <!-- LEFT -->
+  <div class="menu-side">
+    <div class="top-bar">
+      <div class="brand">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="12" fill="rgba(255,255,255,0.18)"/><path d="M7 13l4 4 8-8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="brand-name">FOUR SEASON</span>
+        <span class="brand-sub">RESTAURANT</span>
+      </div>
+      <div class="right">
+        <div class="order-type-toggle" id="orderTypeToggle">
+          <button class="active" data-type="Dine In">Dine In</button>
+          <button data-type="Take Out">Take Out</button>
+        </div>
+        <span class="datetime" id="datetime"></span>
+      </div>
+    </div>
+    <div class="cat-bar" id="catBar"></div>
+    <div class="search-bar" id="searchBar">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Search menu..." autocomplete="off" />
+      <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+    </div>
+    <div class="menu-grid" id="menuGrid"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="order-side">
+    <button class="mobile-back-btn" id="mobileBackBtn" onclick="showMobileMenu()">← Back to Menu</button>
+    <div class="order-header">
+      <h2>Order</h2>
+      <button class="clear-btn" id="clearBtn" onclick="clearOrder()">Clear All</button>
+    </div>
+    <div class="dine-in-info show" id="dineInInfo">
+      <div class="dine-in-field">
+        <label>Table #</label>
+        <input type="text" id="tableNumber" placeholder="—" maxlength="3">
+      </div>
+      <div class="dine-in-field">
+        <label>Guests</label>
+        <input type="number" id="guestCount" placeholder="—" min="1" max="99">
+      </div>
+    </div>
+    <div class="pickup-info" id="pickupInfo">
+      <div class="pickup-label">Pickup Time</div>
+      <div class="pickup-time-display" id="pickupTimeDisplay">10 min</div>
+      <div class="pickup-controls">
+        <button class="pickup-btn minus" onclick="changePickupTime(-5)">−5 min</button>
+        <button class="pickup-btn minus" onclick="changePickupTime(-1)">−1 min</button>
+        <button class="pickup-btn plus" onclick="changePickupTime(1)">+1 min</button>
+        <button class="pickup-btn plus" onclick="changePickupTime(5)">+5 min</button>
+      </div>
+    </div>
+    <div class="order-items" id="orderItems">
+      <div class="empty-state" id="emptyState">
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none"><path d="M8 14h5l4 20h22l4.5-15H14" stroke="#d0c9bd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="42" r="3" stroke="#d0c9bd" stroke-width="2"/><circle cx="37" cy="42" r="3" stroke="#d0c9bd" stroke-width="2"/></svg>
+        <span>Tap any item to add it to the<br>order</span>
+      </div>
+    </div>
+    <div class="order-footer">
+      <div class="order-meta" id="orderMeta" style="display:none"><span id="metaCount"></span><span id="metaInfo"></span></div>
+      <div class="total-row">
+        <span class="total-label">TOTAL</span>
+        <span class="total-amount" id="totalAmount">$0.00</span>
+      </div>
+      <button class="print-btn" id="printBtn" onclick="completeOrder()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print Receipt
+      </button>
+    </div>
+  </div>
+  <!-- MOBILE CART TOGGLE -->
+  <button class="mobile-cart-toggle" id="mobileCartBtn" onclick="showMobileCart()">
+    🛒<span class="cart-badge" id="mobileCartBadge"></span>
+  </button>
+  <div class="cart-toast" id="cartToast"><span class="toast-check">✓</span><span id="cartToastText"></span></div>
+</div>
+<div class="modal-overlay" id="spiceModal">
+  <div class="spice-modal">
+    <h3>Select Spice Level</h3>
+    <div class="item-label" id="spiceItemName"></div>
+    <div class="spice-options" id="spiceOptions">
+      <div class="spice-option" data-level="Mild" onclick="selectSpice('Mild')">
+        <span class="spice-icon">🌶️</span>
+        <div class="spice-info">
+          <div class="spice-name">Mild</div>
+          <div class="spice-desc">Light heat, gentle flavor</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>
+      <div class="spice-option" data-level="Medium" onclick="selectSpice('Medium')">
+        <span class="spice-icon">🌶️🌶️</span>
+        <div class="spice-info">
+          <div class="spice-name">Medium</div>
+          <div class="spice-desc">Balanced heat & flavor</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>
+      <div class="spice-option" data-level="Spicy" onclick="selectSpice('Spicy')">
+        <span class="spice-icon">🌶️🌶️🌶️</span>
+        <div class="spice-info">
+          <div class="spice-name">Spicy</div>
+          <div class="spice-desc">Authentic hot & bold</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>
+      <div class="spice-option" data-level="Ex Spicy" onclick="selectSpice('Ex Spicy')">
+        <span class="spice-icon">🔥🔥🔥</span>
+        <div class="spice-info">
+          <div class="spice-name">Ex Spicy</div>
+          <div class="spice-desc">Maximum heat! 🥵 (+$1.00)</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSpiceModal()">Cancel</button>
+      <button class="btn-confirm" id="confirmSpiceBtn" onclick="confirmSpiceSelection()" disabled>Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMBO CUSTOMIZATION MODAL -->
+<div class="modal-overlay" id="comboModal">
+  <div class="combo-modal">
+    <h3>Customize Your Combo</h3>
+    <div class="item-label" id="comboItemName"></div>
+    <div id="comboCustomizationContent"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeComboModal()">Cancel</button>
+      <button class="btn-confirm" onclick="confirmComboCustomization()">Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- RICE SELECTION MODAL -->
+<div class="modal-overlay" id="riceModal">
+  <div class="spice-modal">
+    <h3>Choose Your Rice</h3>
+    <div class="item-label" id="riceItemName"></div>
+    <div style="font-size: 12px; color: #0e7c6b; margin-bottom: 16px; padding: 8px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; text-align: center;">🍚 All entrées include steamed rice</div>
+    <div class="spice-options" id="riceOptions">
+      <div class="spice-option" data-rice="Steamed Rice" onclick="selectRice('Steamed Rice')">
+        <span class="spice-icon">🍚</span>
+        <div class="spice-info">
+          <div class="spice-name">Steamed Rice</div>
+          <div class="spice-desc">Included free with your entrée</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>
+      <div class="spice-option" data-rice="Pork Fried Rice" onclick="selectRice('Pork Fried Rice')">
+        <span class="spice-icon">🍳</span>
+        <div class="spice-info">
+          <div class="spice-name">Pork Fried Rice</div>
+          <div class="spice-desc">Upgrade for +$2.00</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeRiceModal()">Cancel</button>
+      <button class="btn-confirm" id="confirmRiceBtn" onclick="confirmRiceSelection()" disabled>Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAUCE SIZE MODAL (Take Out) -->
+<div class="modal-overlay" id="sauceModal">
+  <div class="spice-modal">
+    <h3>Select Cup Size</h3>
+    <div class="item-label" id="sauceItemName"></div>
+    <div style="font-size: 12px; color: #0e7c6b; margin-bottom: 16px; padding: 8px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; text-align: center;">🥡 Take-out sauce cups — select a size</div>
+    <div class="spice-options" id="sauceOptions"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSauceModal()">Cancel</button>
+      <button class="btn-confirm" id="confirmSauceBtn" onclick="confirmSauceSelection()" disabled>Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAMILY STYLE MODAL -->
+<div class="modal-overlay" id="familyModal">
+  <div class="combo-modal" style="max-width: 480px;">
+    <h3 id="familyModalTitle">Family Style Dinner</h3>
+    <div class="item-label" id="familyItemName"></div>
+    <div id="familyModalContent"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeFamilyModal()">Cancel</button>
+      <button class="btn-confirm" id="confirmFamilyBtn" onclick="confirmFamilyOrder()">Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIPT PAGE -->
+<div class="receipt-page" id="receiptPage">
+  <div class="receipt-card" id="receiptCard">
+    <div class="r-header">
+      <div class="r-name">FOUR SEASON</div>
+      <div class="r-sub">RESTAURANT</div>
+      <div class="r-addr">122 SE K St, Grants Pass, OR 97526</div>
+    </div>
+    <div class="r-divider"></div>
+    <div class="r-meta"><span id="rOrderNum"></span><span id="rOrderType"></span></div>
+    <div class="r-table-info" id="rTableInfo" style="display:none"><span id="rTableNum"></span><span id="rGuestCount"></span></div>
+    <div class="r-pickup-info" id="rPickupInfo" style="display:none"><span class="r-pickup-label">🥡 Pickup:</span><span class="r-pickup-time" id="rPickupTime"></span><span class="r-pickup-minutes" id="rPickupMinutes"></span></div>
+    <div class="r-time" id="rTime"></div>
+    <div class="r-divider"></div>
+    <div id="rItems"></div>
+    <div class="r-divider thick"></div>
+    <div class="r-total"><span>TOTAL</span><span class="r-total-amt" id="rTotal"></span></div>
+    <div class="r-divider"></div>
+    <div class="r-tip-section" id="rTipSection">
+      <div class="r-tip-title">Suggested Gratuity</div>
+      <div class="r-tip-row r-tip-header"><span>%</span><span>Tip</span><span class="r-tip-total">Tip + Total</span></div>
+      <div class="r-tip-line" style="margin-top:4px"></div>
+      <div class="r-tip-row"><span>18%</span><span id="rTip18"></span><span class="r-tip-total" id="rWithTip18"></span></div>
+      <div class="r-tip-row"><span>20%</span><span id="rTip20"></span><span class="r-tip-total" id="rWithTip20"></span></div>
+      <div class="r-tip-row"><span>25%</span><span id="rTip25"></span><span class="r-tip-total" id="rWithTip25"></span></div>
+      <div class="r-tip-line"></div>
+      <div class="r-tip-row r-tip-custom"><span>Other: $_______</span><span></span><span class="r-tip-total">$_______</span></div>
+    </div>
+    <div class="r-divider"></div>
+    <div class="r-footer">Thank you for your order!</div>
+  </div>
+  <div class="receipt-actions">
+    <button class="btn-back-order" onclick="backToOrder()">← Back to Order</button>
+    <button class="btn-print-receipt" onclick="printReceipt()">Print</button>
+    <button class="btn-new-order" onclick="newOrder()">New Order</button>
+  </div>
+</div>
+
+<script>
+const menu = {
+  "Appetizers": [
+    { name: "Crab Puffs", price: 10.25 },
+    { name: "BBQ Pork", price: 12.25 },
+    { name: "Spring Rolls (3pc)", price: 9.25 },
+    { name: "Fried Wonton", price: 9.25 },
+    { name: "Fried Shrimp (10pc)", price: 11.50 },
+    { name: "Fried Shrimp (15pc)", price: 13.75 },
+    { name: "Potstickers (8pc)", price: 11.25 },
+    { name: "Combo Appetizer", price: 13.75, subtitle: "Fried Shrimp, BBQ Pork, Spring Roll, Crab Puff" },
+  ],
+  "Soup": [
+    { name: "Egg Flower Soup (Cup)", price: 4.00 },
+    { name: "Egg Flower Soup (Small)", price: 5.00 },
+    { name: "Egg Flower Soup (Large)", price: 7.50 },
+    { name: "Wonton Soup", price: 13.00, subtitle: "Shrimp, BBQ Pork, & Veggies" },
+    { name: "Vegetable Soup", price: 10.00 },
+    { name: "BBQ Pork Noodles Soup", price: 12.00 },
+    { name: "Chicken Noodle Soup", price: 12.00 },
+  ],
+  "Lunch Menu": [
+    { name: "L1. Chicken or Beef w/ Pea Pod", price: 14.75, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L2. Broccoli Beef or Chicken", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L3. Moo Goo Gai Pan", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L4. Curry Chicken or Beef 🌶", price: 14.50, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L5. Cashew Chicken", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L6. Kung Pao Chicken or Beef 🌶", price: 14.50, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L7. Chicken or Beef w/ Garlic Sauce 🌶", price: 14.50, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L8. Kung Pao Shrimp 🌶", price: 16.00, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L9. Mongolian Beef or Chicken 🌶", price: 14.75, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L10. Green Pepper Beef or Chicken", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L11. Mandarin Chicken 🌶", price: 14.75, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L12. General Tso's Chicken 🌶", price: 14.75, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L13. Orange Chicken 🌶", price: 14.75, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L14. Sesame Chicken 🌶", price: 14.75, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L15. Mixed Vegetable Deluxe", price: 13.75, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L16. Sesame Tofu w/ Vegetable 🌶", price: 14.50, spicy: true, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L17. Mongolian Tofu w/ Vegetable", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "L18. Home Style Tofu w/ Vegetable", price: 14.50, section: "Lunch Specialty", subtitle: "Served w/ Pork Fried Rice & Spring Roll or Crab Puffs" },
+    { name: "Choice Combo (2 Items)", price: 12.75, section: "Choice Combinations", subtitle: "Pick 2: Pork Fried Rice, Pork Chow Mein, Spring Roll, Mar Far Chicken, Sweet & Sour Pork, BBQ Pork (+$1), Crab Meat Puffs, Chicken Chow Mein, Sweet & Sour Chicken, Fried Shrimp (+$1), Cashew Subgum Chk CM" },
+    { name: "Choice Combo (3 Items)", price: 13.75, section: "Choice Combinations", subtitle: "Pick 3: Pork Fried Rice, Pork Chow Mein, Spring Roll, Mar Far Chicken, Sweet & Sour Pork, BBQ Pork (+$1), Crab Meat Puffs, Chicken Chow Mein, Sweet & Sour Chicken, Fried Shrimp (+$1), Cashew Subgum Chk CM" },
+    { name: "Choice Combo (4 Items)", price: 14.75, section: "Choice Combinations", subtitle: "Pick 4: Pork Fried Rice, Pork Chow Mein, Spring Roll, Mar Far Chicken, Sweet & Sour Pork, BBQ Pork (+$1), Crab Meat Puffs, Chicken Chow Mein, Sweet & Sour Chicken, Fried Shrimp (+$1), Cashew Subgum Chk CM" },
+    { name: "Shrimp Lo Mein", price: 16.25, section: "Lo Mein or Chow Mein", subtitle: "Served with soft noodles" },
+    { name: "Beef, Chicken or BBQ Pork Lo Mein", price: 14.75, section: "Lo Mein or Chow Mein", subtitle: "Served with soft noodles" },
+    { name: "Vegetable Lo Mein", price: 14.00, section: "Lo Mein or Chow Mein", subtitle: "Served with soft noodles" },
+    { name: "House Chow Mein 🌶", price: 16.00, spicy: true, section: "Lo Mein or Chow Mein", subtitle: "Chicken, BBQ pork, shrimp" },
+  ],
+  "Family Style": [
+    { 
+      name: "Style A", price: 18.00, perPerson: true, familyStyle: true, minPeople: 2,
+      subtitle: "Spring Rolls, BBQ Pork, Crab Puffs, Cashew Chicken, Pork Fried Rice, Sweet & Sour Pork, Fried Shrimp",
+      items: [
+        { name: "Spring Rolls", original: "Spring Rolls" },
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Crab Puffs", original: "Crab Puffs" },
+        { name: "Cashew Chicken", original: "Cashew Chicken" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Sweet & Sour Pork", original: "Sweet & Sour Pork" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" }
+      ],
+      bonusDish: { name: "General Tao's Chicken", threshold: 4, spicy: true }
+    },
+    { 
+      name: "Style B", price: 18.75, perPerson: true, familyStyle: true, minPeople: 2,
+      subtitle: "Spring Rolls, BBQ Pork, Crab Puffs, Broccoli Beef, Mar Far Chicken, Pork Fried Rice, Fried Shrimp",
+      items: [
+        { name: "Spring Rolls", original: "Spring Rolls" },
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Crab Puffs", original: "Crab Puffs" },
+        { name: "Broccoli Beef", original: "Broccoli Beef" },
+        { name: "Mar Far Chicken", original: "Mar Far Chicken" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" }
+      ],
+      bonusDish: { name: "Orange Chicken", threshold: 4, spicy: true }
+    },
+    { 
+      name: "Style C", price: 19.75, perPerson: true, familyStyle: true, minPeople: 2,
+      subtitle: "Spring Rolls, BBQ Pork, Crab Puffs, Mongolian Chicken 🌶, Sweet & Sour Chicken, Szechwan Shrimp 🌶, Pork Fried Rice",
+      items: [
+        { name: "Spring Rolls", original: "Spring Rolls" },
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Crab Puffs", original: "Crab Puffs" },
+        { name: "Mongolian Chicken", original: "Mongolian Chicken", spicy: true },
+        { name: "Sweet & Sour Chicken", original: "Sweet & Sour Chicken" },
+        { name: "Szechwan Shrimp", original: "Szechwan Shrimp", spicy: true },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" }
+      ],
+      bonusDish: { name: "Fried Shrimp", threshold: 4, spicy: false }
+    },
+    { 
+      name: "Style D", price: 17.75, perPerson: true, familyStyle: true, minPeople: 2,
+      subtitle: "Spring Rolls, BBQ Pork, Crab Puffs, Pork Fried Rice, Mar Far Chicken, Sweet & Sour Pork, Cashew Subgum Chicken Chow Mein w/ Pan Fried Noodles",
+      items: [
+        { name: "Spring Rolls", original: "Spring Rolls" },
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Crab Puffs", original: "Crab Puffs" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Mar Far Chicken", original: "Mar Far Chicken" },
+        { name: "Sweet & Sour Pork", original: "Sweet & Sour Pork" },
+        { name: "Cashew Subgum Chk CM w/ Pan Fried Noodles", original: "Cashew Subgum Chk CM w/ Pan Fried Noodles" }
+      ],
+      bonusDish: { name: "Fried Shrimp", threshold: 3, spicy: false }
+    },
+  ],
+  "Dinner Combos": [
+    { 
+      name: "Deluxe Special", 
+      price: 18.50,
+      items: [
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" },
+        { name: "Egg Roll", original: "Egg Roll" },
+        { name: "Cashew Chicken Subgum Chow Mein w/ Crispy Noodles", original: "Cashew Chicken Subgum CM" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" }
+      ]
+    },
+    { 
+      name: "No.1", 
+      price: 15.50,
+      items: [
+        { name: "Pork Chow Mein", original: "Pork Chow Mein" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Sweet & Sour Pork", original: "Sweet & Sour Pork" }
+      ]
+    },
+    { 
+      name: "No.2", 
+      price: 16.25,
+      items: [
+        { name: "Fried Shrimp", original: "Fried Shrimp" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Mar Far Chicken", original: "Mar Far Chicken" }
+      ]
+    },
+    { 
+      name: "No.3", 
+      price: 17.50,
+      items: [
+        { name: "Pork Chow Mein", original: "Pork Chow Mein" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" },
+        { name: "Sweet & Sour Chicken", original: "Sweet & Sour Chicken" }
+      ]
+    },
+    { 
+      name: "No.4", 
+      price: 17.50,
+      items: [
+        { name: "Chicken Chow Mein", original: "Chicken Chow Mein" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" },
+        { name: "Mar Far Chicken", original: "Mar Far Chicken" }
+      ]
+    },
+    { 
+      name: "No.5", 
+      price: 17.25,
+      items: [
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Spring Roll", original: "Spring Roll" },
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" }
+      ]
+    },
+    { 
+      name: "No.6", 
+      price: 17.75,
+      items: [
+        { name: "Broccoli Beef", original: "Broccoli Beef" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" },
+        { name: "Sweet & Sour Pork", original: "Sweet & Sour Pork" }
+      ]
+    },
+    { 
+      name: "No.7", 
+      price: 17.75,
+      items: [
+        { name: "Kung Pao Chicken", original: "Kung Pao Chicken", spicy: true },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "Fried Shrimp", original: "Fried Shrimp" },
+        { name: "Sweet & Sour Pork", original: "Sweet & Sour Pork" }
+      ]
+    },
+    { 
+      name: "No.8", 
+      price: 17.75,
+      items: [
+        { name: "Broccoli Chicken", original: "Broccoli Chicken" },
+        { name: "Pork Fried Rice", original: "Pork Fried Rice" },
+        { name: "BBQ Pork", original: "BBQ Pork" },
+        { name: "Mar Far Chicken", original: "Mar Far Chicken" }
+      ]
+    }
+  ],
+  "Sweet & Sour": [
+    { name: "Sweet & Sour Pork", price: 15.75 },
+    { name: "Sweet & Sour Chicken", price: 16.75 },
+    { name: "Sweet & Sour Shrimp", price: 18.00 },
+    { name: "Sweet & Sour Combo", price: 18.75 },
+  ],
+  "Seafood": [
+    { name: "Kung Pao Shrimp 🌶", price: 18.25, spicy: true },
+    { name: "Curry Shrimp 🌶", price: 18.25, spicy: true },
+    { name: "Szechwan Shrimp 🌶", price: 19.25, spicy: true },
+    { name: "Happy Family", price: 19.25 },
+    { name: "Shrimp w/ Pea Pods", price: 18.25 },
+    { name: "Walnut Shrimp", price: 21.00 },
+  ],
+  "Chicken": [
+    { name: "Mar Far Chicken", price: 16.50 },
+    { name: "Lemon Chicken", price: 17.25 },
+    { name: "Cashew Chicken", price: 17.25 },
+    { name: "Moo Goo Gai Pan", price: 16.75 },
+    { name: "Broccoli Chicken", price: 16.75 },
+    { name: "Kung Pao Chicken 🌶", price: 16.75, spicy: true },
+    { name: "Curry Chicken 🌶", price: 16.75, spicy: true },
+    { name: "Chicken w/ Pea Pods", price: 17.75 },
+    { name: "Mongolian Chicken 🌶", price: 16.75, spicy: true },
+    { name: "Szechwan Chicken 🌶", price: 17.75, spicy: true },
+    { name: "Mandarin Chicken 🌶", price: 17.75, spicy: true },
+  ],
+  "Beef": [
+    { name: "Broccoli Beef", price: 17.50 },
+    { name: "Kung Pao Beef 🌶", price: 17.50, spicy: true },
+    { name: "Curry Beef 🌶", price: 17.50, spicy: true },
+    { name: "Beef w/ Pea Pods", price: 18.50 },
+    { name: "Szechwan Beef 🌶", price: 18.50, spicy: true },
+    { name: "Mongolian Beef 🌶", price: 18.50, spicy: true },
+  ],
+  "Fried Rice": [
+    { name: "Egg Fried Rice", price: 13.00 },
+    { name: "Pork Fried Rice", price: 13.75 },
+    { name: "Chicken Fried Rice", price: 15.00 },
+    { name: "Beef Fried Rice", price: 15.50 },
+    { name: "Shrimp Fried Rice", price: 16.50 },
+    { name: "House Special Fried Rice", price: 17.00 },
+    { name: "Vegetable Fried Rice", price: 14.75 },
+    { name: "Steam Rice (Cup)", price: 4.50 },
+    { name: "Steam Rice (Bowl)", price: 5.50 },
+  ],
+  "Chow Mein": [
+    { name: "Vegetable Chow Mein", price: 14.00 },
+    { name: "Pork Chow Mein", price: 14.75 },
+    { name: "Chicken Chow Mein", price: 16.50 },
+    { name: "Beef Chow Mein", price: 16.75 },
+    { name: "Cashew Chk Subgum CM", price: 15.75 },
+    { name: "Shrimp Chow Mein", price: 17.50 },
+  ],
+  "Lo Mein": [
+    { name: "Vegetable Lo Mein", price: 16.75 },
+    { name: "Pork Lo Mein", price: 17.00 },
+    { name: "Chicken Lo Mein", price: 17.00 },
+    { name: "Beef Lo Mein", price: 17.00 },
+    { name: "Shrimp Lo Mein", price: 18.50 },
+    { name: "House Special Lo Mein", price: 18.75 },
+  ],
+  "Vegetarian": [
+    { name: "Sauteed Pea Pods", price: 16.00 },
+    { name: "Sauteed Broccoli", price: 15.75 },
+    { name: "Mixed Vegetable Deluxe", price: 15.75 },
+    { name: "Sesame Tofu w/ Vegetables 🌶", price: 16.75, spicy: true },
+    { name: "Mongolian Tofu w/ Vegetables", price: 16.75 },
+    { name: "Home Style Tofu w/ Vegetable 🌶", price: 16.75, spicy: true, subtitle: "Cooked in Black Bean Sauce" },
+    { name: "Vegetable Low Mein", price: 16.75 },
+  ],
+  "Specialty Noodles": [
+    { name: "Garlic Pan Fried Noodle", price: 13.00, subtitle: "Onion, bean sprout in stir fry" },
+    { name: "House Special Chow Mein 🌶", price: 18.75, spicy: true, subtitle: "Scallop, shrimp, chicken, BBQ pork, veggies & pan-fried noodles in spicy house sauce" },
+    { name: "Hong Kong Chow Mai", price: 18.75, subtitle: "Shrimp, chicken, BBQ pork, egg, veggies & rice noodles stir fry in Hong Kong style" },
+    { name: "Singapore Chow Mai 🌶", price: 18.75, spicy: true, subtitle: "Shrimp, BBQ pork, egg, veggies & rice noodles stir fry with curry flavor" },
+    { name: "Beef Chow Fun", price: 17.75 },
+    { name: "Chef's Special Chow Fun 🌶", price: 18.75, spicy: true, subtitle: "Beef, shrimp, BBQ pork, veggies, rice noodles stir fry in Chef's special spicy sauce" },
+  ],
+  "Chef's Specialties": [
+    { name: "General Tso's Chicken 🌶", price: 17.50, spicy: true, subtitle: "Chunks of chicken fried crispy then cooked with our unique house sauce" },
+    { name: "Orange Chicken 🌶", price: 17.50, spicy: true, subtitle: "Pieces of crispy chicken fried then cooked with chef's special hot sauce with a touch of orange peel flavor" },
+    { name: "Orange Shrimp 🌶", price: 18.50, spicy: true, subtitle: "Shrimp fried cooked with chef's special hot sauce with a touch of orange peel flavor" },
+    { name: "Chicken Three Styles 🌶", price: 20.50, spicy: true, subtitle: "General's Tao's Chicken, Sweet & Sour Chicken, and Kung Pao Chicken" },
+    { name: "Sesame Chicken 🌶", price: 17.75, spicy: true, subtitle: "Mar Far Chicken cooked in our Spicy Mandarin sauce" },
+    { name: "Kung Pao Deluxe 🌶", price: 18.75, spicy: true, subtitle: "Shrimp, beef & chicken sauteed with veggies in spicy chef's sauce" },
+    { name: "Four Treasure w/ Garlic Sauce 🌶", price: 19.50, spicy: true, subtitle: "Beef, shrimp, BBQ pork and chicken sauteed with selected veggies in spicy Szechuan garlic sauce" },
+    { name: "Pad Thai (Chk/Pork/Beef/Tofu)", price: 16.00, noRice: true },
+    { name: "Pad Thai (Shrimp)", price: 17.75, noRice: true },
+  ],
+  "Drinks": [
+    { name: "Dr. Pepper", price: 3.50, section: "Sodas" },
+    { name: "Lemonade", price: 3.50, section: "Sodas" },
+    { name: "Starry", price: 3.50, section: "Sodas" },
+    { name: "Pepsi", price: 3.50, section: "Sodas" },
+    { name: "Diet Pepsi", price: 3.50, section: "Sodas" },
+    { name: "Mt. Dew", price: 3.50, section: "Sodas" },
+    { name: "Ice Tea", price: 3.50, section: "Sodas" },
+    { name: "Root Beer", price: 3.50, section: "Sodas" },
+    { name: "Bud Light", price: 5.75, section: "Beers" },
+    { name: "Budweiser", price: 5.75, section: "Beers" },
+    { name: "Coors Light", price: 5.75, section: "Beers" },
+    { name: "Heineken", price: 6.75, section: "Beers" },
+    { name: "Corona", price: 6.75, section: "Beers" },
+    { name: "Tsingtao", price: 6.75, section: "Beers" },
+    { name: "Chang", price: 6.75, section: "Beers" },
+    { name: "Chardonnay (Glass)", price: 6.50, section: "Wine" },
+    { name: "Merlot (Glass)", price: 6.50, section: "Wine" },
+    { name: "Blush (Glass)", price: 6.50, section: "Wine" },
+    { name: "Burgundy (Glass)", price: 6.50, section: "Wine" },
+    { name: "Chardonnay (Half Carafe)", price: 10.50, section: "Wine" },
+    { name: "Merlot (Half Carafe)", price: 10.50, section: "Wine" },
+    { name: "Blush (Half Carafe)", price: 10.50, section: "Wine" },
+    { name: "Burgundy (Half Carafe)", price: 10.50, section: "Wine" },
+    { name: "Hot Tea", price: 1.00, section: "Hot Drinks" },
+  ],
+  "Dim Sum": [
+    { name: "BBQ Pork Buns (4pc)", price: 9.75 },
+    { name: "Sesame Balls (8pc)", price: 9.25 },
+    { name: "Shrimp Dumplings (8pc)", price: 10.75 },
+    { name: "Shu Mai (8pc)", price: 9.75 },
+    { name: "Mini Steam Dumplings (6pc)", price: 9.50 },
+  ],
+  "Sauces": [
+    { name: "Hot Mustard", price: 0, sauce: true, saucePremium: true },
+    { name: "Ketchup", price: 0, sauce: true, saucePremium: false },
+    { name: "Pink Sauce", price: 0, sauce: true, saucePremium: false },
+    { name: "Sesame Seeds", price: 0, sauce: true, saucePremium: false },
+    { name: "Sweet & Sour Sauce", price: 0, sauce: true, saucePremium: false },
+  ],
+  "Utensils": [
+    { name: "Forks", price: 0 },
+    { name: "Spoons", price: 0 },
+    { name: "Paper Plates", price: 0 },
+  ],
+};
+
+// Substitution options for combo customization
+const SUBSTITUTION_OPTIONS = [
+  "Keep Original",
+  "Fried Shrimp",
+  "Sweet & Sour Pork",
+  "Mar Far Chicken",
+  "Sweet & Sour Chicken",
+  "Pork Lo Mein",
+  "Chicken Lo Mein",
+  "Beef Lo Mein",
+  "Vegetable Lo Mein",
+  "BBQ Pork",
+  "Spring Roll",
+  "Steam Rice",
+  "Remove Item"
+];
+
+let order = [];
+let activeCategory = "Appetizers";
+let orderType = "Dine In";
+let orderNumber = Math.floor(Math.random() * 9000) + 1000;
+
+// Spice modal state
+let pendingSpicyItem = null;
+let selectedSpiceLevel = null;
+
+// Combo modal state
+let pendingComboItem = null;
+let comboCustomizations = {};
+let selectedComboSpiceLevel = "Medium"; // Default spice level for combos
+
+// Rice modal state
+const RICE_CATEGORIES = ["Sweet & Sour", "Seafood", "Chicken", "Beef", "Vegetarian", "Chef's Specialties"];
+const RICE_UPGRADE_PRICE = 2.00;
+let pendingRiceItem = null;
+let selectedRiceOption = null;
+
+// Sauce modal state
+const SAUCE_SIZES = [
+  { label: "1 oz Cup", oz: 1, icon: "🥄", basePrice: 1.00 },
+  { label: "4 oz Cup", oz: 4, icon: "🥤", basePrice: 2.00 },
+  { label: "8 oz Cup", oz: 8, icon: "🫙", basePrice: 3.50 },
+];
+let pendingSauceItem = null;
+let selectedSauceSize = null;
+
+// Pickup time state
+let pickupMinutes = 10;
+function changePickupTime(delta) {
+  haptic('light');
+  pickupMinutes = Math.max(1, pickupMinutes + delta);
+  document.getElementById("pickupTimeDisplay").textContent = pickupMinutes + " min";
+}
+
+// Family Style modal state
+const FAMILY_SUBSTITUTION_OPTIONS = [
+  "Keep Original",
+  "Fried Shrimp",
+  "Sweet & Sour Pork",
+  "Sweet & Sour Chicken",
+  "Mar Far Chicken",
+  "Cashew Chicken",
+  "Broccoli Beef",
+  "Broccoli Chicken",
+  "Kung Pao Chicken 🌶",
+  "Mongolian Chicken 🌶",
+  "Orange Chicken 🌶",
+  "General Tao's Chicken 🌶",
+  "BBQ Pork",
+  "Pork Fried Rice",
+  "Spring Rolls",
+  "Crab Puffs",
+  "Egg Rolls",
+  "Remove Item"
+];
+const FAMILY_SUB_COST = 1.50;
+let pendingFamilyItem = null;
+let familyPeopleCount = 2;
+let familyCustomizations = {};
+let familyBonusCustomization = null;
+let selectedFamilySpiceLevel = "Medium";
+
+function fp(p) { return "$" + p.toFixed(2); }
+
+// ─── HAPTIC FEEDBACK ───
+function haptic(type) {
+  if (!navigator.vibrate) return;
+  switch(type) {
+    case 'light':   navigator.vibrate(10); break;    // category tap, qty change
+    case 'medium':  navigator.vibrate(25); break;    // menu item tap, modal option select
+    case 'heavy':   navigator.vibrate([30, 30, 30]); break; // add to order confirm
+    case 'success': navigator.vibrate([15, 50, 30]); break; // complete order, print
+    case 'error':   navigator.vibrate([50, 30, 50, 30, 50]); break; // clear all, remove
+    default:        navigator.vibrate(15);
+  }
+}
+
+function getDateTime() {
+  const d = new Date();
+  const time = d.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  const date = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return time + " · " + date;
+}
+
+function renderCategories() {
+  const bar = document.getElementById("catBar");
+  bar.innerHTML = "";
+  Object.keys(menu).forEach(cat => {
+    const btn = document.createElement("button");
+    btn.className = "cat-btn" + (cat === activeCategory ? " active" : "");
+    btn.textContent = cat;
+    btn.onclick = () => { haptic('light'); activeCategory = cat; document.getElementById("searchInput").value = ""; document.getElementById("searchClear").classList.remove("show"); document.getElementById("catBar").style.display = ""; renderCategories(); renderMenuItems(); };
+    bar.appendChild(btn);
+  });
+}
+
+function renderMenuItems() {
+  const grid = document.getElementById("menuGrid");
+  grid.innerHTML = "";
+  const searchTerm = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+  
+  // If searching, show results across all categories
+  if (searchTerm.length > 0) {
+    let resultCount = 0;
+    Object.keys(menu).forEach(cat => {
+      const matches = menu[cat].filter(item => {
+        const nameMatch = item.name.toLowerCase().includes(searchTerm);
+        const subtitleMatch = item.subtitle && item.subtitle.toLowerCase().includes(searchTerm);
+        return nameMatch || subtitleMatch;
+      });
+      if (matches.length === 0) return;
+      
+      // Category header
+      const header = document.createElement("div");
+      header.className = "menu-section-header";
+      header.textContent = cat;
+      grid.appendChild(header);
+      
+      matches.forEach(item => {
+        resultCount++;
+        renderMenuItem(grid, item, cat);
+      });
+    });
+    
+    if (resultCount === 0) {
+      const empty = document.createElement("div");
+      empty.className = "search-results-label";
+      empty.textContent = "No items found";
+      grid.appendChild(empty);
+    }
+    return;
+  }
+  
+  // Normal category view
+  let currentSection = null;
+  (menu[activeCategory] || []).forEach(item => {
+    if (item.section && item.section !== currentSection) {
+      currentSection = item.section;
+      const header = document.createElement("div");
+      header.className = "menu-section-header";
+      header.textContent = item.section;
+      grid.appendChild(header);
+    }
+    renderMenuItem(grid, item, activeCategory);
+  });
+}
+
+function renderMenuItem(grid, item, category) {
+  const div = document.createElement("div");
+  div.className = "menu-item";
+  div.onclick = () => { 
+    haptic('medium'); 
+    const prevCat = activeCategory;
+    activeCategory = category;
+    addItemToOrder(item); 
+    activeCategory = prevCat;
+  };
+  
+  let priceText = item.perPerson ? fp(item.price) + " /person" : fp(item.price);
+  let nameHTML = item.name;
+  let subtitleHTML = item.subtitle ? `<div class="item-subtitle">${item.subtitle}</div>` : '';
+  
+  if (item.sauce) {
+    if (orderType === "Dine In") {
+      priceText = "FREE";
+      subtitleHTML = '<div class="item-subtitle">Complimentary with dine-in</div>';
+    } else {
+      const startPrice = item.saucePremium ? 1.50 : 1.00;
+      priceText = "from " + fp(startPrice);
+      subtitleHTML = '<div class="item-subtitle">Tap to select cup size</div>';
+    }
+  }
+  
+  div.innerHTML = `<div class="item-name">${nameHTML}</div><div class="item-price">${priceText}</div>${subtitleHTML}`;
+  grid.appendChild(div);
+}
+
+// Search functionality
+let searchDebounce = null;
+document.getElementById("searchInput").addEventListener("input", function() {
+  const val = this.value.trim();
+  document.getElementById("searchClear").classList.toggle("show", val.length > 0);
+  // Hide cat bar when searching, show when not
+  document.getElementById("catBar").style.display = val.length > 0 ? "none" : "";
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => renderMenuItems(), 150);
+});
+
+function clearSearch() {
+  const input = document.getElementById("searchInput");
+  input.value = "";
+  document.getElementById("searchClear").classList.remove("show");
+  document.getElementById("catBar").style.display = "";
+  renderMenuItems();
+  input.focus();
+}
+
+function addItemToOrder(item) {
+  // Handle Family Style items - open family style modal
+  if (item.familyStyle) {
+    showFamilyModal(item);
+    return;
+  }
+  
+  // Handle Dinner Combos - show customization modal
+  if (activeCategory === "Dinner Combos") {
+    showComboCustomization(item);
+    return;
+  }
+  
+  // Handle regular spicy items (rice modal will chain after spice for rice categories)
+  if (item.spicy) {
+    pendingSpicyItem = { ...item, category: activeCategory };
+    document.getElementById("spiceItemName").textContent = item.name;
+    document.getElementById("spiceModal").classList.add("show");
+    return;
+  }
+  
+  // Handle non-spicy items in rice categories - show rice modal (skip if noRice)
+  if (RICE_CATEGORIES.includes(activeCategory) && !item.noRice) {
+    showRiceModal({ ...item, qty: 1, category: activeCategory });
+    return;
+  }
+  
+  // Handle sauce items
+  if (item.sauce) {
+    if (orderType === "Dine In") {
+      // Dine in: free
+      const existing = order.find(o => o.name === item.name && o.sauce && !o.sauceSize);
+      if (existing) {
+        existing.qty++;
+      } else {
+        order.push({ ...item, qty: 1, price: 0, category: "Sauces" });
+      }
+      renderOrder();
+    } else {
+      // Take out: show size modal
+      showSauceModal(item);
+    }
+    return;
+  }
+  
+  // Add regular item (no spice, no rice)
+  const existing = order.find(o => o.name === item.name && !o.spiceLevel && !o.customizations && !o.riceChoice);
+  if (existing) {
+    existing.qty++;
+  } else {
+    order.push({ ...item, qty: 1, category: activeCategory });
+  }
+  renderOrder();
+}
+
+function showComboCustomization(comboItem) {
+  pendingComboItem = { ...comboItem };
+  comboCustomizations = {};
+  
+  // Initialize customizations with original items
+  if (comboItem.items) {
+    comboItem.items.forEach((item, idx) => {
+      comboCustomizations[idx] = {
+        original: item.name,
+        current: item.name,
+        removed: false,
+        spicy: item.spicy || false
+      };
+    });
+  }
+  
+  document.getElementById("comboItemName").textContent = comboItem.name;
+  
+  const content = document.getElementById("comboCustomizationContent");
+  
+  // Check if any items are spicy
+  const hasSpicyItems = (comboItem.items || []).some(item => item.spicy);
+  const spicyNote = hasSpicyItems ? '<div style="font-size: 12px; color: #c0392b; margin-bottom: 12px; padding: 8px; background: #fff5f5; border-radius: 6px; border: 1px solid #fecaca;">🌶️ This combo includes spicy items. Please select your spice level below.</div>' : '';
+  const subNote = '<div style="font-size: 12px; color: #0e7c6b; margin-bottom: 12px; padding: 8px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0;">💰 Substitutions are $1.50 each. Removals are free.</div>';
+  
+  // Spice level selector if combo has spicy items
+  const spiceSelector = hasSpicyItems ? `
+    <div class="combo-section" style="margin-bottom: 20px;">
+      <div class="combo-section-title">Spice Level</div>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+        <div class="spice-option" data-level="Mild" onclick="selectComboSpice('Mild')" style="padding: 10px; border-radius: 8px; border: 2px solid #e0dcd4; background: #faf8f4; cursor: pointer; text-align: center;">
+          <div style="font-weight: 700; font-size: 14px;">Mild 🌶️</div>
+        </div>
+        <div class="spice-option selected" data-level="Medium" onclick="selectComboSpice('Medium')" style="padding: 10px; border-radius: 8px; border: 2px solid #0e7c6b; background: #e8f5f3; cursor: pointer; text-align: center;">
+          <div style="font-weight: 700; font-size: 14px;">Medium 🌶️🌶️</div>
+        </div>
+        <div class="spice-option" data-level="Spicy" onclick="selectComboSpice('Spicy')" style="padding: 10px; border-radius: 8px; border: 2px solid #e0dcd4; background: #faf8f4; cursor: pointer; text-align: center;">
+          <div style="font-weight: 700; font-size: 14px;">Spicy 🌶️🌶️🌶️</div>
+        </div>
+        <div class="spice-option" data-level="Ex Spicy" onclick="selectComboSpice('Ex Spicy')" style="padding: 10px; border-radius: 8px; border: 2px solid #e0dcd4; background: #faf8f4; cursor: pointer; text-align: center;">
+          <div style="font-weight: 700; font-size: 14px;">Ex Spicy 🔥</div>
+          <div style="font-size: 11px; color: #c0392b; margin-top: 2px;">+$1.00</div>
+        </div>
+      </div>
+    </div>
+  ` : '';
+  
+  content.innerHTML = `
+    ${spicyNote}
+    ${subNote}
+    ${spiceSelector}
+    <div class="combo-section">
+      <div class="combo-section-title">Customize Items</div>
+      ${(comboItem.items || []).map((item, idx) => {
+        const spicyLabel = item.spicy ? ' 🌶️' : '';
+        return `
+        <div class="combo-item-row" id="comboRow${idx}">
+          <div class="item-info">
+            <div class="item-name">${item.name}${spicyLabel}</div>
+            <div class="item-original">Original: ${item.original}</div>
+          </div>
+          <select id="comboSelect${idx}" onchange="updateComboCustomization(${idx}, this.value)">
+            ${SUBSTITUTION_OPTIONS.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+          </select>
+        </div>
+      `}).join('')}
+    </div>
+  `;
+  
+  document.getElementById("comboModal").classList.add("show");
+}
+
+function selectComboSpice(level) {
+  haptic('light');
+  selectedComboSpiceLevel = level;
+  // Update visual selection
+  document.querySelectorAll("#comboCustomizationContent .spice-option").forEach(opt => {
+    if (opt.getAttribute('data-level') === level) {
+      opt.style.border = '2px solid #0e7c6b';
+      opt.style.background = '#e8f5f3';
+      opt.classList.add('selected');
+    } else {
+      opt.style.border = '2px solid #e0dcd4';
+      opt.style.background = '#faf8f4';
+      opt.classList.remove('selected');
+    }
+  });
+}
+
+function updateComboCustomization(idx, value) {
+  if (value === "Remove Item") {
+    comboCustomizations[idx].current = null;
+    comboCustomizations[idx].removed = true;
+  } else if (value === "Keep Original") {
+    comboCustomizations[idx].current = comboCustomizations[idx].original;
+    comboCustomizations[idx].removed = false;
+  } else {
+    comboCustomizations[idx].current = value;
+    comboCustomizations[idx].removed = false;
+  }
+}
+
+function confirmComboCustomization() {
+  haptic('heavy');
+  if (!pendingComboItem) return;
+  
+  // Build customization summary and count substitutions
+  let customizationText = [];
+  let hasSpicyItem = false;
+  let substitutionCount = 0;
+  
+  Object.keys(comboCustomizations).forEach(idx => {
+    const cust = comboCustomizations[idx];
+    if (cust.removed) {
+      customizationText.push(`Remove ${cust.original}`);
+    } else if (cust.current !== cust.original) {
+      customizationText.push(`${cust.original} → ${cust.current}`);
+      substitutionCount++; // Count this as a substitution
+    }
+    if (cust.spicy && !cust.removed) {
+      hasSpicyItem = true;
+    }
+  });
+  
+  // Calculate final price with substitution charges and Ex Spicy charge
+  const substitutionCharge = substitutionCount * 1.50;
+  const exSpicyCharge = (hasSpicyItem && selectedComboSpiceLevel === "Ex Spicy") ? 1.00 : 0;
+  const finalPrice = pendingComboItem.price + substitutionCharge + exSpicyCharge;
+  
+  // Add substitution charge to summary if applicable
+  if (substitutionCount > 0) {
+    customizationText.push(`+$${substitutionCharge.toFixed(2)} (${substitutionCount} substitution${substitutionCount > 1 ? 's' : ''})`);
+  }
+  
+  const orderItem = {
+    ...pendingComboItem,
+    qty: 1,
+    category: activeCategory,
+    customizations: Object.values(comboCustomizations),
+    customizationSummary: customizationText.length > 0 ? customizationText.join('; ') : null,
+    spiceLevel: hasSpicyItem ? selectedComboSpiceLevel : null,
+    price: finalPrice,
+    basePrice: pendingComboItem.price,
+    substitutionCharge: substitutionCharge,
+    substitutionCount: substitutionCount,
+    extraSpicyCharge: exSpicyCharge
+  };
+  
+  order.push(orderItem);
+  renderOrder();
+  closeComboModal();
+}
+
+function closeComboModal() {
+  document.getElementById("comboModal").classList.remove("show");
+  pendingComboItem = null;
+  comboCustomizations = {};
+  selectedComboSpiceLevel = "Medium"; // Reset to default
+}
+
+function selectSpice(level) {
+  haptic('light');
+  selectedSpiceLevel = level;
+  document.querySelectorAll("#spiceModal .spice-option").forEach(o => o.classList.remove("selected"));
+  document.querySelector(`#spiceModal [data-level="${level}"]`).classList.add("selected");
+  document.getElementById("confirmSpiceBtn").disabled = false;
+}
+
+function confirmSpiceSelection() {
+  haptic('heavy');
+  if (!pendingSpicyItem || !selectedSpiceLevel) return;
+  
+  // Calculate price with Extra Spicy upcharge
+  let finalPrice = pendingSpicyItem.price;
+  const exSpicyCharge = selectedSpiceLevel === "Ex Spicy" ? 1.00 : 0;
+  if (selectedSpiceLevel === "Ex Spicy") {
+    finalPrice += 1.00;
+  }
+  
+  // Build the item with spice info
+  const spicedItem = { 
+    ...pendingSpicyItem, 
+    qty: 1, 
+    spiceLevel: selectedSpiceLevel,
+    category: pendingSpicyItem.category,
+    price: finalPrice,
+    basePrice: pendingSpicyItem.price,
+    extraSpicyCharge: exSpicyCharge
+  };
+  
+  // If item is in a rice category, chain to rice modal (skip if noRice)
+  if (RICE_CATEGORIES.includes(pendingSpicyItem.category) && !pendingSpicyItem.noRice) {
+    closeSpiceModal();
+    showRiceModal(spicedItem);
+    return;
+  }
+  
+  // Otherwise add directly (non-rice category spicy items like Family Style)
+  const existing = order.find(o => 
+    o.name === pendingSpicyItem.name && 
+    o.spiceLevel === selectedSpiceLevel &&
+    !o.customizations && !o.riceChoice
+  );
+  
+  if (existing) {
+    existing.qty++;
+  } else {
+    order.push(spicedItem);
+  }
+  
+  renderOrder();
+  closeSpiceModal();
+}
+
+function closeSpiceModal() {
+  document.getElementById("spiceModal").classList.remove("show");
+  document.querySelectorAll("#spiceModal .spice-option").forEach(o => o.classList.remove("selected"));
+  document.getElementById("confirmSpiceBtn").disabled = true;
+  pendingSpicyItem = null;
+  selectedSpiceLevel = null;
+}
+
+// Rice modal functions
+function showRiceModal(item) {
+  pendingRiceItem = item;
+  selectedRiceOption = null;
+  document.getElementById("riceItemName").textContent = item.name;
+  document.querySelectorAll("#riceModal .spice-option").forEach(o => o.classList.remove("selected"));
+  document.getElementById("confirmRiceBtn").disabled = true;
+  document.getElementById("riceModal").classList.add("show");
+}
+
+function selectRice(option) {
+  haptic('light');
+  selectedRiceOption = option;
+  document.querySelectorAll("#riceModal .spice-option").forEach(o => o.classList.remove("selected"));
+  document.querySelector(`#riceModal [data-rice="${option}"]`).classList.add("selected");
+  document.getElementById("confirmRiceBtn").disabled = false;
+}
+
+function confirmRiceSelection() {
+  haptic('heavy');
+  if (!pendingRiceItem || !selectedRiceOption) return;
+  
+  const riceUpcharge = selectedRiceOption === "Pork Fried Rice" ? RICE_UPGRADE_PRICE : 0;
+  const finalPrice = pendingRiceItem.price + riceUpcharge;
+  
+  // Check for existing matching item (same name, spice level, and rice choice)
+  const existing = order.find(o => 
+    o.name === pendingRiceItem.name && 
+    o.spiceLevel === (pendingRiceItem.spiceLevel || null) &&
+    o.riceChoice === selectedRiceOption &&
+    !o.customizations
+  );
+  
+  if (existing) {
+    existing.qty++;
+  } else {
+    const orderItem = {
+      ...pendingRiceItem,
+      price: finalPrice,
+      riceChoice: selectedRiceOption,
+      riceUpcharge: riceUpcharge
+    };
+    // Update basePrice to reflect the original menu price (before any upcharges)
+    if (!orderItem.basePrice) {
+      orderItem.basePrice = pendingRiceItem.price;
+    }
+    order.push(orderItem);
+  }
+  
+  renderOrder();
+  closeRiceModal();
+}
+
+function closeRiceModal() {
+  document.getElementById("riceModal").classList.remove("show");
+  document.querySelectorAll("#riceModal .spice-option").forEach(o => o.classList.remove("selected"));
+  document.getElementById("confirmRiceBtn").disabled = true;
+  pendingRiceItem = null;
+  selectedRiceOption = null;
+}
+
+// Sauce modal functions
+function showSauceModal(item) {
+  pendingSauceItem = { ...item };
+  selectedSauceSize = null;
+  document.getElementById("sauceItemName").textContent = item.name;
+  document.getElementById("confirmSauceBtn").disabled = true;
+  
+  const isPremium = item.saucePremium;
+  const optionsDiv = document.getElementById("sauceOptions");
+  optionsDiv.innerHTML = SAUCE_SIZES.map(s => {
+    const price = isPremium ? +(s.basePrice * 1.5).toFixed(2) : s.basePrice;
+    return `
+      <div class="spice-option" data-sauce="${s.oz}" onclick="selectSauceSize(${s.oz})">
+        <span class="spice-icon">${s.icon}</span>
+        <div class="spice-info">
+          <div class="spice-name">${s.label}</div>
+          <div class="spice-desc">${fp(price)}</div>
+        </div>
+        <div class="checkmark"></div>
+      </div>`;
+  }).join('');
+  
+  document.getElementById("sauceModal").classList.add("show");
+}
+
+function selectSauceSize(oz) {
+  haptic('light');
+  selectedSauceSize = oz;
+  document.querySelectorAll("#sauceModal .spice-option").forEach(o => o.classList.remove("selected"));
+  document.querySelector(`#sauceModal [data-sauce="${oz}"]`).classList.add("selected");
+  document.getElementById("confirmSauceBtn").disabled = false;
+}
+
+function confirmSauceSelection() {
+  haptic('heavy');
+  if (!pendingSauceItem || !selectedSauceSize) return;
+  
+  const sizeInfo = SAUCE_SIZES.find(s => s.oz === selectedSauceSize);
+  const isPremium = pendingSauceItem.saucePremium;
+  const price = isPremium ? +(sizeInfo.basePrice * 1.5).toFixed(2) : sizeInfo.basePrice;
+  
+  const existing = order.find(o => 
+    o.name === pendingSauceItem.name && 
+    o.sauceSize === sizeInfo.label
+  );
+  
+  if (existing) {
+    existing.qty++;
+  } else {
+    order.push({
+      ...pendingSauceItem,
+      qty: 1,
+      price: price,
+      sauceSize: sizeInfo.label,
+      category: "Sauces"
+    });
+  }
+  
+  renderOrder();
+  closeSauceModal();
+}
+
+function closeSauceModal() {
+  document.getElementById("sauceModal").classList.remove("show");
+  pendingSauceItem = null;
+  selectedSauceSize = null;
+}
+
+// ─── FAMILY STYLE MODAL FUNCTIONS ───
+
+function showFamilyModal(item) {
+  pendingFamilyItem = { ...item };
+  familyPeopleCount = 2;
+  familyCustomizations = {};
+  familyBonusCustomization = null;
+  selectedFamilySpiceLevel = "Medium";
+  
+  // Init customizations
+  if (item.items) {
+    item.items.forEach((itm, idx) => {
+      familyCustomizations[idx] = {
+        original: itm.name,
+        current: itm.name,
+        removed: false
+      };
+    });
+  }
+  // Init bonus customization
+  if (item.bonusDish) {
+    familyBonusCustomization = {
+      original: item.bonusDish.name,
+      current: item.bonusDish.name,
+      removed: false
+    };
+  }
+  
+  document.getElementById("familyModalTitle").textContent = item.name + " — Family Style";
+  document.getElementById("familyItemName").textContent = fp(item.price) + " per person";
+  
+  renderFamilyModalContent();
+  document.getElementById("familyModal").classList.add("show");
+}
+
+function renderFamilyModalContent() {
+  const item = pendingFamilyItem;
+  if (!item) return;
+  
+  const bonus = item.bonusDish;
+  const bonusActive = bonus && familyPeopleCount >= bonus.threshold;
+  const hasSpicyItems = (item.items || []).some(i => i.spicy) || (bonusActive && bonus.spicy);
+  
+  // Count substitutions
+  let subCount = 0;
+  Object.values(familyCustomizations).forEach(c => {
+    if (!c.removed && c.current !== c.original) subCount++;
+  });
+  if (bonusActive && familyBonusCustomization && !familyBonusCustomization.removed && familyBonusCustomization.current !== familyBonusCustomization.original) {
+    subCount++;
+  }
+  
+  const subTotal = subCount * FAMILY_SUB_COST * familyPeopleCount;
+  const baseTotal = item.price * familyPeopleCount;
+  const exSpicyCharge = (hasSpicyItems && selectedFamilySpiceLevel === "Ex Spicy") ? (1.00 * familyPeopleCount) : 0;
+  const grandTotal = baseTotal + subTotal + exSpicyCharge;
+  
+  const content = document.getElementById("familyModalContent");
+  
+  // People count selector
+  const peopleSelectorHTML = `
+    <div class="combo-section">
+      <div class="combo-section-title">👥 Number of People</div>
+      <div style="display: flex; align-items: center; gap: 16px; padding: 12px; background: #f9f7f4; border-radius: 8px; margin-bottom: 8px;">
+        <button class="qty-btn" onclick="changeFamilyPeople(-1)" style="width: 38px; height: 38px; font-size: 22px;">−</button>
+        <span style="font-size: 24px; font-weight: 800; min-width: 40px; text-align: center; color: #0e7c6b;" id="familyPeopleDisplay">${familyPeopleCount}</span>
+        <button class="qty-btn" onclick="changeFamilyPeople(1)" style="width: 38px; height: 38px; font-size: 22px;">+</button>
+        <span style="font-size: 13px; color: #888; margin-left: 8px;">minimum ${item.minPeople || 2}</span>
+      </div>
+    </div>
+  `;
+  
+  // Bonus dish banner
+  let bonusBannerHTML = '';
+  if (bonus) {
+    if (bonusActive) {
+      bonusBannerHTML = `
+        <div style="font-size: 13px; color: #065f46; margin-bottom: 14px; padding: 10px 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">🎉</span>
+          <div><strong>Bonus Dish Unlocked!</strong> ${bonus.name} included for ${bonus.threshold}+ people</div>
+        </div>`;
+    } else {
+      const needed = bonus.threshold - familyPeopleCount;
+      bonusBannerHTML = `
+        <div style="font-size: 13px; color: #92400e; margin-bottom: 14px; padding: 10px 12px; background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">💡</span>
+          <div>Add <strong>${needed} more</strong> person${needed > 1 ? 's' : ''} to unlock <strong>${bonus.name}</strong></div>
+        </div>`;
+    }
+  }
+  
+  // Substitution cost note
+  const subNoteHTML = `
+    <div style="font-size: 12px; color: #0e7c6b; margin-bottom: 14px; padding: 8px 12px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0;">
+      💰 Substitutions: <strong>$${FAMILY_SUB_COST.toFixed(2)} × ${familyPeopleCount} people = ${fp(FAMILY_SUB_COST * familyPeopleCount)}</strong> per substitution. Removals are free.
+    </div>`;
+  
+  // Spice level selector if any spicy items
+  let spiceSelectorHTML = '';
+  if (hasSpicyItems) {
+    spiceSelectorHTML = `
+      <div class="combo-section" style="margin-bottom: 16px;">
+        <div class="combo-section-title">🌶️ Spice Level (for spicy dishes)</div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          ${['Mild', 'Medium', 'Spicy', 'Ex Spicy'].map(level => {
+            const sel = level === selectedFamilySpiceLevel;
+            const icon = level === 'Ex Spicy' ? '🔥' : '🌶️'.repeat(level === 'Mild' ? 1 : level === 'Medium' ? 2 : 3);
+            const extra = level === 'Ex Spicy' ? `<div style="font-size: 11px; color: #c0392b; margin-top: 2px;">+$1.00 × ${familyPeopleCount} = +${fp(familyPeopleCount)}</div>` : '';
+            return `<div onclick="selectFamilySpice('${level}')" style="padding: 10px; border-radius: 8px; border: 2px solid ${sel ? '#0e7c6b' : '#e0dcd4'}; background: ${sel ? '#e8f5f3' : '#faf8f4'}; cursor: pointer; text-align: center;">
+              <div style="font-weight: 700; font-size: 14px;">${level} ${icon}</div>${extra}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+  
+  // Items list
+  const itemsHTML = (item.items || []).map((itm, idx) => {
+    const spicyLabel = itm.spicy ? ' 🌶️' : '';
+    const cust = familyCustomizations[idx];
+    const isSubbed = cust && cust.current !== cust.original && !cust.removed;
+    const isRemoved = cust && cust.removed;
+    return `
+      <div class="combo-item-row" style="${isRemoved ? 'opacity: 0.4;' : ''}${isSubbed ? 'border-left: 3px solid #f59e0b;' : ''}">
+        <div class="item-info">
+          <div class="item-name">${itm.name}${spicyLabel}</div>
+          ${isSubbed ? `<div style="font-size: 11px; color: #f59e0b; font-weight: 600; margin-top: 2px;">→ ${cust.current} (+${fp(FAMILY_SUB_COST * familyPeopleCount)})</div>` : ''}
+          ${isRemoved ? `<div style="font-size: 11px; color: #999; margin-top: 2px;">Removed</div>` : ''}
+        </div>
+        <select onchange="updateFamilyItem(${idx}, this.value)" style="padding: 8px 12px; border: 1px solid #e0dcd4; border-radius: 6px; font-size: 13px; font-weight: 600; background: #fff; cursor: pointer;">
+          ${FAMILY_SUBSTITUTION_OPTIONS.map(opt => `<option value="${opt}" ${cust && ((opt === 'Keep Original' && cust.current === cust.original && !cust.removed) || (opt === 'Remove Item' && cust.removed) || (opt === cust.current && !cust.removed && opt !== 'Keep Original')) ? 'selected' : ''}>${opt}</option>`).join('')}
+        </select>
+      </div>`;
+  }).join('');
+  
+  // Bonus dish row
+  let bonusItemHTML = '';
+  if (bonusActive && familyBonusCustomization) {
+    const bc = familyBonusCustomization;
+    const isBonusSubbed = bc.current !== bc.original && !bc.removed;
+    const isBonusRemoved = bc.removed;
+    const spicyLabel = bonus.spicy ? ' 🌶️' : '';
+    bonusItemHTML = `
+      <div class="combo-section" style="margin-top: 16px;">
+        <div class="combo-section-title">🎁 Bonus Dish (${bonus.threshold}+ People)</div>
+        <div class="combo-item-row" style="border: 2px solid #a7f3d0; background: #f0fdf4;${isBonusRemoved ? 'opacity: 0.4;' : ''}${isBonusSubbed ? 'border-left: 3px solid #f59e0b;' : ''}">
+          <div class="item-info">
+            <div class="item-name">${bonus.name}${spicyLabel}</div>
+            ${isBonusSubbed ? `<div style="font-size: 11px; color: #f59e0b; font-weight: 600; margin-top: 2px;">→ ${bc.current} (+${fp(FAMILY_SUB_COST * familyPeopleCount)})</div>` : ''}
+            ${isBonusRemoved ? `<div style="font-size: 11px; color: #999; margin-top: 2px;">Removed</div>` : ''}
+          </div>
+          <select onchange="updateFamilyBonus(this.value)" style="padding: 8px 12px; border: 1px solid #e0dcd4; border-radius: 6px; font-size: 13px; font-weight: 600; background: #fff; cursor: pointer;">
+            ${FAMILY_SUBSTITUTION_OPTIONS.map(opt => `<option value="${opt}" ${((opt === 'Keep Original' && bc.current === bc.original && !bc.removed) || (opt === 'Remove Item' && bc.removed) || (opt === bc.current && !bc.removed && opt !== 'Keep Original')) ? 'selected' : ''}>${opt}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+  }
+  
+  // Price summary
+  const priceHTML = `
+    <div style="margin-top: 16px; padding: 14px; background: #faf8f4; border-radius: 10px; border: 1px solid #e0dcd4;">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 6px;">
+        <span>Base: ${fp(item.price)} × ${familyPeopleCount}</span><span>${fp(baseTotal)}</span>
+      </div>
+      ${subCount > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 13px; color: #f59e0b; margin-bottom: 6px;">
+        <span>Subs: ${subCount} × $${FAMILY_SUB_COST.toFixed(2)} × ${familyPeopleCount}</span><span>+${fp(subTotal)}</span>
+      </div>` : ''}
+      ${exSpicyCharge > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 13px; color: #c0392b; margin-bottom: 6px;">
+        <span>Ex Spicy: $1.00 × ${familyPeopleCount}</span><span>+${fp(exSpicyCharge)}</span>
+      </div>` : ''}
+      <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; color: #0e7c6b; border-top: 1px solid #e0dcd4; padding-top: 8px; margin-top: 4px;">
+        <span>Total</span><span>${fp(grandTotal)}</span>
+      </div>
+    </div>`;
+  
+  content.innerHTML = peopleSelectorHTML + bonusBannerHTML + subNoteHTML + spiceSelectorHTML +
+    `<div class="combo-section"><div class="combo-section-title">🍽️ Included Items</div>${itemsHTML}</div>` +
+    bonusItemHTML + priceHTML;
+}
+
+function changeFamilyPeople(delta) {
+  const minPeople = pendingFamilyItem ? (pendingFamilyItem.minPeople || 2) : 2;
+  familyPeopleCount = Math.max(minPeople, familyPeopleCount + delta);
+  renderFamilyModalContent();
+}
+
+function selectFamilySpice(level) {
+  selectedFamilySpiceLevel = level;
+  renderFamilyModalContent();
+}
+
+function updateFamilyItem(idx, value) {
+  if (value === "Remove Item") {
+    familyCustomizations[idx].current = null;
+    familyCustomizations[idx].removed = true;
+  } else if (value === "Keep Original") {
+    familyCustomizations[idx].current = familyCustomizations[idx].original;
+    familyCustomizations[idx].removed = false;
+  } else {
+    familyCustomizations[idx].current = value;
+    familyCustomizations[idx].removed = false;
+  }
+  renderFamilyModalContent();
+}
+
+function updateFamilyBonus(value) {
+  if (!familyBonusCustomization) return;
+  if (value === "Remove Item") {
+    familyBonusCustomization.current = null;
+    familyBonusCustomization.removed = true;
+  } else if (value === "Keep Original") {
+    familyBonusCustomization.current = familyBonusCustomization.original;
+    familyBonusCustomization.removed = false;
+  } else {
+    familyBonusCustomization.current = value;
+    familyBonusCustomization.removed = false;
+  }
+  renderFamilyModalContent();
+}
+
+function confirmFamilyOrder() {
+  haptic('heavy');
+  if (!pendingFamilyItem) return;
+  
+  const item = pendingFamilyItem;
+  const bonus = item.bonusDish;
+  const bonusActive = bonus && familyPeopleCount >= bonus.threshold;
+  const hasSpicyItems = (item.items || []).some(i => i.spicy) || (bonusActive && bonus.spicy);
+  
+  // Count substitutions
+  let subCount = 0;
+  let customizationText = [];
+  
+  Object.keys(familyCustomizations).forEach(idx => {
+    const cust = familyCustomizations[idx];
+    if (cust.removed) {
+      customizationText.push(`Remove ${cust.original}`);
+    } else if (cust.current !== cust.original) {
+      customizationText.push(`${cust.original} → ${cust.current}`);
+      subCount++;
+    }
+  });
+  
+  if (bonusActive && familyBonusCustomization) {
+    const bc = familyBonusCustomization;
+    if (bc.removed) {
+      customizationText.push(`Remove bonus: ${bc.original}`);
+    } else if (bc.current !== bc.original) {
+      customizationText.push(`Bonus: ${bc.original} → ${bc.current}`);
+      subCount++;
+    } else {
+      customizationText.push(`Bonus: ${bc.original}`);
+    }
+  }
+  
+  const subTotal = subCount * FAMILY_SUB_COST * familyPeopleCount;
+  const exSpicyCharge = (hasSpicyItems && selectedFamilySpiceLevel === "Ex Spicy") ? (1.00 * familyPeopleCount) : 0;
+  const baseTotal = item.price * familyPeopleCount;
+  const grandTotal = baseTotal + subTotal + exSpicyCharge;
+  
+  if (subCount > 0) {
+    customizationText.push(`+${fp(subTotal)} (${subCount} sub${subCount > 1 ? 's' : ''} × ${familyPeopleCount} ppl)`);
+  }
+  
+  const orderItem = {
+    name: `${item.name} (${familyPeopleCount} ppl)`,
+    qty: 1,
+    category: "Family Style",
+    price: grandTotal,
+    basePrice: baseTotal,
+    perPerson: false, // Already calculated
+    familyStyle: true,
+    familyPeopleCount: familyPeopleCount,
+    customizations: Object.values(familyCustomizations),
+    customizationSummary: customizationText.length > 0 ? customizationText.join('; ') : null,
+    spiceLevel: hasSpicyItems ? selectedFamilySpiceLevel : null,
+    extraSpicyCharge: exSpicyCharge,
+    substitutionCharge: subTotal,
+    substitutionCount: subCount
+  };
+  
+  order.push(orderItem);
+  renderOrder();
+  closeFamilyModal();
+}
+
+function closeFamilyModal() {
+  document.getElementById("familyModal").classList.remove("show");
+  pendingFamilyItem = null;
+  familyCustomizations = {};
+  familyBonusCustomization = null;
+  selectedFamilySpiceLevel = "Medium";
+  familyPeopleCount = 2;
+}
+
+function changeQty(idx, delta) {
+  haptic('light');
+  order[idx].qty += delta;
+  if (order[idx].qty <= 0) {
+    order.splice(idx, 1);
+  }
+  renderOrder();
+}
+
+function removeItem(idx) {
+  haptic('error');
+  order.splice(idx, 1);
+  renderOrder();
+}
+
+function clearOrder() {
+  haptic('error');
+  order = [];
+  _prevOrderTotal = 0;
+  renderOrder();
+}
+
+let _prevOrderTotal = 0;
+function renderOrder() {
+  // Detect new item additions for mobile toast
+  const currentTotal = order.reduce((s, i) => s + i.qty, 0);
+  if (currentTotal > _prevOrderTotal && order.length > 0) {
+    const lastItem = order[order.length - 1];
+    showCartToast(lastItem.name);
+  }
+  _prevOrderTotal = currentTotal;
+
+  const container = document.getElementById("orderItems");
+  const isEmpty = order.length === 0;
+  
+  document.getElementById("emptyState").style.display = isEmpty ? "flex" : "none";
+  document.getElementById("orderMeta").style.display = isEmpty ? "none" : "flex";
+  document.getElementById("clearBtn").classList.toggle("show", !isEmpty);
+  document.getElementById("printBtn").classList.toggle("enabled", !isEmpty);
+  
+  // Remove only order rows, preserving the emptyState div
+  container.querySelectorAll(".order-row").forEach(r => r.remove());
+  
+  if (!isEmpty) {
+    order.forEach((item, idx) => {
+      const row = document.createElement("div");
+      row.className = "order-row";
+      
+      const displayPrice = item.price;
+      let eachText;
+      if (item.familyStyle && item.familyPeopleCount) {
+        const extras = item.price - item.basePrice;
+        eachText = extras > 0 
+          ? `${item.familyPeopleCount} ppl × base + ${fp(extras)} extras`
+          : `${item.familyPeopleCount} ppl × ${fp(item.basePrice / item.familyPeopleCount)}/ea`;
+      } else {
+        eachText = item.basePrice && item.basePrice !== item.price 
+          ? `${fp(item.basePrice)} + ${fp(item.price - item.basePrice)} extra` 
+          : `${fp(displayPrice)} each`;
+      }
+      
+      let spiceTag = "";
+      if (item.spiceLevel) {
+        const spiceClass = item.spiceLevel.toLowerCase().replace(" ", "-");
+        const spiceText = item.extraSpicyCharge > 0 ? `${item.spiceLevel} (+$1)` : item.spiceLevel;
+        spiceTag = `<div class="spice-tag ${spiceClass}">${spiceText}</div>`;
+      }
+      
+      let riceTag = "";
+      if (item.riceChoice) {
+        const riceText = item.riceUpcharge > 0 ? `${item.riceChoice} (+$2)` : item.riceChoice;
+        riceTag = `<div class="rice-tag">🍚 ${riceText}</div>`;
+      }
+      
+      let sauceTag = "";
+      if (item.sauceSize) {
+        sauceTag = `<div class="sauce-tag paid">🥡 ${item.sauceSize}</div>`;
+      } else if (item.sauce && item.price === 0) {
+        sauceTag = `<div class="sauce-tag free">✓ Free</div>`;
+      }
+      
+      let customTag = "";
+      if (item.customizationSummary && item.customizationSummary.length > 0) {
+        customTag = `<div class="custom-tag">${item.customizationSummary}</div>`;
+      }
+      
+      row.innerHTML = `
+        <div class="info">
+          <div class="name">${item.name}</div>
+          <div class="each">${eachText}</div>
+          ${spiceTag}${riceTag}${sauceTag}
+          ${customTag}
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
+          <span class="qty-num">${item.qty}</span>
+          <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+        </div>
+        <span class="row-total">${(item.sauce && item.price === 0) ? 'FREE' : fp(displayPrice * item.qty)}</span>
+        <button class="remove-btn" onclick="removeItem(${idx})">×</button>
+      `;
+      container.appendChild(row);
+    });
+
+    const count = order.reduce((s, i) => s + i.qty, 0);
+    document.getElementById("metaCount").textContent = count + " item" + (count !== 1 ? "s" : "");
+    document.getElementById("metaInfo").textContent = "#" + orderNumber + " · " + orderType;
+  }
+
+  const total = order.reduce((s, i) => s + i.price * i.qty, 0);
+  document.getElementById("totalAmount").textContent = fp(total);
+  updateMobileCartBadge();
+}
+
+function completeOrder() {
+  if (order.length === 0) return;
+  haptic('success');
+  const total = order.reduce((s, i) => s + i.price * i.qty, 0);
+
+  document.getElementById("rOrderNum").textContent = "Order #" + orderNumber;
+  document.getElementById("rOrderType").textContent = orderType;
+  document.getElementById("rTime").textContent = getDateTime();
+  document.getElementById("rTotal").textContent = fp(total);
+  
+  // Tip suggestions
+  const tip18 = total * 0.18;
+  const tip20 = total * 0.20;
+  const tip25 = total * 0.25;
+  document.getElementById("rTip18").textContent = fp(tip18);
+  document.getElementById("rTip20").textContent = fp(tip20);
+  document.getElementById("rTip25").textContent = fp(tip25);
+  document.getElementById("rWithTip18").textContent = fp(total + tip18);
+  document.getElementById("rWithTip20").textContent = fp(total + tip20);
+  document.getElementById("rWithTip25").textContent = fp(total + tip25);
+  
+  // Table and guest info (only for Dine In)
+  const tableInfo = document.getElementById("rTableInfo");
+  if (orderType === "Dine In") {
+    const tableNum = document.getElementById("tableNumber").value;
+    const guestCount = document.getElementById("guestCount").value;
+    
+    if (tableNum || guestCount) {
+      tableInfo.style.display = "flex";
+      document.getElementById("rTableNum").textContent = tableNum ? "Table " + tableNum : "";
+      document.getElementById("rGuestCount").textContent = guestCount ? guestCount + " Guest" + (guestCount !== "1" ? "s" : "") : "";
+    } else {
+      tableInfo.style.display = "none";
+    }
+  } else {
+    tableInfo.style.display = "none";
+  }
+
+  // Pickup time (only for Take Out)
+  const pickupInfo = document.getElementById("rPickupInfo");
+  if (orderType === "Take Out") {
+    pickupInfo.style.display = "flex";
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + pickupMinutes);
+    const pickupTimeStr = now.toLocaleString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    document.getElementById("rPickupTime").textContent = pickupTimeStr;
+    document.getElementById("rPickupMinutes").textContent = "(" + pickupMinutes + " min)";
+  } else {
+    pickupInfo.style.display = "none";
+  }
+
+  const rItems = document.getElementById("rItems");
+  rItems.innerHTML = "";
+  order.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "r-item";
+    
+    let modifiers = [];
+    if (item.spiceLevel) {
+      const spiceText = item.extraSpicyCharge > 0 ? `${item.spiceLevel} +$1` : item.spiceLevel;
+      modifiers.push(spiceText);
+    }
+    if (item.riceChoice) {
+      const riceText = item.riceUpcharge > 0 ? `${item.riceChoice} +$2` : item.riceChoice;
+      modifiers.push(riceText);
+    }
+    if (item.sauceSize) {
+      modifiers.push(item.sauceSize);
+    } else if (item.sauce && item.price === 0) {
+      modifiers.push("Free");
+    }
+    let modText = modifiers.length > 0 ? `<span class="r-spice"> (${modifiers.join(', ')})</span>` : '';
+    
+    let customText = (item.customizationSummary && item.customizationSummary.length > 0) ? `<span class="r-custom">${item.customizationSummary}</span>` : '';
+    
+    const priceDisplay = (item.sauce && item.price === 0) ? 'FREE' : fp(item.price * item.qty);
+    div.innerHTML = `<div class="r-item-line"><span><span class="r-qty">${item.qty}x</span> ${item.name}${modText}</span><span class="r-price">${priceDisplay}</span></div>${customText}`;
+    rItems.appendChild(div);
+  });
+
+  document.getElementById("mainView").style.display = "none";
+  document.getElementById("receiptPage").classList.add("show");
+  document.body.classList.add("receipt-open");
+}
+
+function printReceipt() {
+  haptic('success');
+  const card = document.getElementById("receiptCard");
+  const w = window.open("", "", "width=1900,height=2000");
+  w.document.write('<html><head><style>@page{size:220mm auto;margin:4mm 2mm}body{font-family:"Courier New",monospace;font-size:49px;font-weight:900;padding:6px 6px;width:216mm;max-width:216mm;margin:0 auto;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:1px #000}.r-header{text-align:center;margin-bottom:30px;padding-bottom:6px}.r-name{font-size:86px;font-weight:900;letter-spacing:5px;display:block;-webkit-text-stroke:3px #000}.r-sub{font-size:55px;font-weight:900;display:block;margin-top:6px;-webkit-text-stroke:2px #000}.r-addr{font-size:41px;font-weight:900;color:#000;margin-top:6px;display:block;-webkit-text-stroke:1.5px #000}.r-divider{border-top:6px dashed #000;margin:18px 0}.r-divider.thick{border-top:8px solid #000;margin:22px 0}.r-meta{display:flex;justify-content:space-between;font-size:44px;font-weight:900;margin-bottom:8px;-webkit-text-stroke:1.5px #000}.r-table-info{display:flex;justify-content:space-between;font-size:47px;font-weight:900;margin-bottom:8px;-webkit-text-stroke:1.5px #000}.r-time{font-size:42px;font-weight:900;color:#000;margin-bottom:14px;-webkit-text-stroke:1.5px #000}.r-item{display:block;padding:14px 0;font-size:56px;font-weight:900;border-bottom:3px dotted #000;-webkit-text-stroke:1.5px #000}.r-item-line{display:flex;justify-content:space-between;width:100%}.r-qty{font-weight:900}.r-price{font-weight:900;white-space:nowrap}.r-spice{font-size:44px;font-weight:900;display:block;margin-top:6px;-webkit-text-stroke:1.5px #000}.r-custom{font-size:41px;font-weight:900;font-style:italic;display:block;margin-top:6px;-webkit-text-stroke:1.5px #000}.r-total{display:flex;justify-content:space-between;font-size:80px;font-weight:900;padding:12px 0;-webkit-text-stroke:3px #000}.r-footer{text-align:center;font-size:44px;font-weight:900;color:#000;margin-top:16px;padding-top:8px;-webkit-text-stroke:1.5px #000}.r-tip-section{padding:14px 0}.r-tip-title{font-size:49px;font-weight:900;text-align:center;margin-bottom:14px;text-transform:uppercase;letter-spacing:2px;-webkit-text-stroke:2px #000}.r-tip-row{display:flex;justify-content:space-between;font-size:47px;font-weight:900;padding:10px 0;-webkit-text-stroke:1.5px #000}.r-tip-row span:first-child{font-weight:900}.r-tip-row span:nth-child(2){flex:1;text-align:center}.r-tip-row.r-tip-header{font-size:31px;font-weight:900;color:#000;text-transform:uppercase;letter-spacing:1px;padding:6px 0 4px;-webkit-text-stroke:1px #000}.r-tip-total{font-weight:900}.r-tip-line{border-top:5px dotted #000;margin:12px 0}.r-tip-custom{font-size:47px;font-weight:900;-webkit-text-stroke:1.5px #000}.r-pickup-info{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;padding:20px 0;text-align:center;width:100%}.r-pickup-label{font-size:51px;font-weight:900;text-transform:uppercase;text-align:center;width:100%;-webkit-text-stroke:2px #000}.r-pickup-time{font-size:105px;font-weight:900;line-height:1.1;text-align:center;width:100%;white-space:nowrap;-webkit-text-stroke:3px #000}.r-pickup-minutes{font-size:47px;font-weight:900;text-align:center;width:100%;white-space:nowrap;-webkit-text-stroke:1.5px #000}</style></head><body>');
+  w.document.write(card.innerHTML);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
+function backToOrder() {
+  haptic('medium');
+  document.getElementById("receiptPage").classList.remove("show");
+  document.body.classList.remove("receipt-open");
+  document.getElementById("mainView").style.display = "";
+  if (isMobile()) {
+    document.querySelector('.menu-side').classList.remove('mobile-hidden');
+    document.querySelector('.order-side').classList.remove('mobile-show');
+    document.getElementById('mobileCartBtn').style.display = '';
+  }
+  renderOrder();
+}
+
+function newOrder() {
+  haptic('success');
+  order = [];
+  _prevOrderTotal = 0;
+  orderNumber++;
+  document.getElementById("tableNumber").value = "";
+  document.getElementById("guestCount").value = "";
+  pickupMinutes = 10;
+  document.getElementById("pickupTimeDisplay").textContent = "10 min";
+  document.getElementById("receiptPage").classList.remove("show");
+  document.body.classList.remove("receipt-open");
+  document.getElementById("mainView").style.display = "";
+  if (isMobile()) {
+    document.querySelector('.menu-side').classList.remove('mobile-hidden');
+    document.querySelector('.order-side').classList.remove('mobile-show');
+    document.getElementById('mobileCartBtn').style.display = '';
+  }
+  renderOrder();
+}
+
+// Order type toggle
+document.getElementById("orderTypeToggle").addEventListener("click", function(e) {
+  if (e.target.tagName === "BUTTON") {
+    haptic('light');
+    orderType = e.target.dataset.type;
+    this.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    
+    // Show/hide dine-in info
+    const dineInInfo = document.getElementById("dineInInfo");
+    const pickupInfo = document.getElementById("pickupInfo");
+    if (orderType === "Dine In") {
+      dineInInfo.classList.add("show");
+      pickupInfo.classList.remove("show");
+    } else {
+      dineInInfo.classList.remove("show");
+      pickupInfo.classList.add("show");
+    }
+    
+    renderMenuItems();
+    renderOrder();
+  }
+});
+
+// Close modal on overlay click
+document.getElementById("spiceModal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    closeSpiceModal();
+  }
+});
+
+document.getElementById("comboModal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    closeComboModal();
+  }
+});
+
+document.getElementById("riceModal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    closeRiceModal();
+  }
+});
+
+document.getElementById("sauceModal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    closeSauceModal();
+  }
+});
+
+document.getElementById("familyModal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    closeFamilyModal();
+  }
+});
+
+// ─── MOBILE NAVIGATION ───
+
+let toastTimer = null;
+function showCartToast(name) {
+  if (!isMobile()) return;
+  const toast = document.getElementById('cartToast');
+  const text = document.getElementById('cartToastText');
+  if (!toast || !text) return;
+  text.textContent = name + ' added';
+  clearTimeout(toastTimer);
+  toast.classList.remove('show');
+  void toast.offsetWidth; // force reflow for re-animation
+  toast.classList.add('show');
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+function isMobile() {
+  return window.innerWidth <= 700;
+}
+
+function showMobileCart() {
+  if (!isMobile()) return;
+  haptic('medium');
+  document.querySelector('.menu-side').classList.add('mobile-hidden');
+  document.querySelector('.order-side').classList.add('mobile-show');
+  document.getElementById('mobileCartBtn').style.display = 'none';
+}
+
+function showMobileMenu() {
+  if (!isMobile()) return;
+  haptic('light');
+  document.querySelector('.menu-side').classList.remove('mobile-hidden');
+  document.querySelector('.order-side').classList.remove('mobile-show');
+  document.getElementById('mobileCartBtn').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function updateMobileCartBadge() {
+  const badge = document.getElementById('mobileCartBadge');
+  if (!badge) return;
+  const count = order.reduce((s, i) => s + i.qty, 0);
+  badge.textContent = count > 0 ? count : '';
+}
+
+// Reset mobile classes on resize
+window.addEventListener('resize', function() {
+  if (!isMobile()) {
+    document.querySelector('.menu-side').classList.remove('mobile-hidden');
+    document.querySelector('.order-side').classList.remove('mobile-show');
+    document.getElementById('mobileCartBtn').style.display = '';
+  }
+});
+
+// Clock
+function updateClock() { document.getElementById("datetime").textContent = getDateTime(); }
+setInterval(updateClock, 30000);
+
+// Init
+updateClock();
+renderCategories();
+renderMenuItems();
+renderOrder();
+</script>
+</body>
+</html>

@@ -321,6 +321,81 @@
   .btn-print-kitchen { background: #c0392b; color: #fff; border: none; }
   .btn-print-kitchen:hover { background: #a93225; }
 
+  /* TABS BAR */
+  .tabs-bar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: #d8d3c8; overflow-x: auto; min-height: 40px; }
+  .tab-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px 6px 12px; background: #fff; border: 1px solid #c4bdae; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 600; color: #555; cursor: pointer; font-family: inherit; white-space: nowrap; transition: all 0.1s; max-width: 200px; }
+  .tab-chip.active { background: #faf6ee; border-color: #0e7c6b; color: #0e7c6b; border-bottom-color: #faf6ee; box-shadow: 0 -2px 0 #0e7c6b inset; }
+  .tab-chip:hover:not(.active) { background: #f0ebe0; }
+  .tab-label { overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+  .tab-count { background: #0e7c6b; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 8px; }
+  .tab-chip:not(.active) .tab-count { background: #b0a895; }
+  .tab-close { background: none; border: none; color: #999; font-size: 18px; padding: 0 2px; line-height: 1; cursor: pointer; border-radius: 4px; }
+  .tab-close:hover { color: #c0392b; background: rgba(192,57,43,0.1); }
+  .tab-chip.active .tab-close { color: #0e7c6b; }
+  .tab-add { background: #fff; border: 1px dashed #b0a895; color: #888; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 700; font-family: inherit; transition: all 0.1s; min-width: 38px; }
+  .tab-add:hover { border-color: #0e7c6b; color: #0e7c6b; background: #faf6ee; }
+  body.dark .tabs-bar { background: #1a1a1a; }
+  body.dark .tab-chip { background: #2a2a2a; border-color: #404040; color: #aaa; }
+  body.dark .tab-chip.active { background: #161616; border-color: #2ddbbf; color: #2ddbbf; border-bottom-color: #161616; box-shadow: 0 -2px 0 #2ddbbf inset; }
+  body.dark .tab-chip:hover:not(.active) { background: #333; }
+  body.dark .tab-add { background: #2a2a2a; border-color: #555; color: #888; }
+  body.dark .tab-add:hover { color: #2ddbbf; border-color: #2ddbbf; background: #1f1f1f; }
+
+  /* COURSE TAGGING */
+  .course-selector { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .course-pill { background: #fff; border: 1px solid #d6d1c7; color: #888; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; cursor: pointer; font-family: inherit; transition: all 0.1s; }
+  .course-pill.active { background: #0e7c6b; border-color: #0e7c6b; color: #fff; }
+  .course-pill:hover:not(.active) { background: #faf6ee; border-color: #0e7c6b; color: #0e7c6b; }
+  body.dark .course-pill { background: #1f1f1f; border-color: #383838; color: #888; }
+  body.dark .course-pill.active { background: #0e7c6b; border-color: #0e7c6b; color: #fff; }
+  body.dark .course-pill:hover:not(.active) { background: #262626; }
+  .course-header { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; padding: 12px 4px 4px; border-bottom: 1px solid #eee; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .course-fire-btn { background: #ff7766; color: #fff; border: none; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; }
+  .course-fire-btn:hover { background: #e85a48; }
+  body.dark .course-header { color: #888; border-color: #2e2e2e; }
+
+  /* FAVORITES STAR */
+  .menu-item { position: relative; }
+  .menu-item .fav-star { position: absolute; top: 6px; right: 8px; background: none; border: none; font-size: 18px; color: #d6d1c7; cursor: pointer; line-height: 1; padding: 2px; opacity: 0; transition: opacity 0.15s, transform 0.1s; z-index: 2; }
+  .menu-item:hover .fav-star, .menu-item .fav-star.active { opacity: 1; }
+  .menu-item .fav-star.active { color: #f0c040; }
+  .menu-item .fav-star:hover { transform: scale(1.2); }
+  body.dark .menu-item .fav-star { color: #444; }
+  body.dark .menu-item .fav-star.active { color: #f0c040; }
+
+  /* ADD-TO-CART PULSE */
+  @keyframes addPulse { 0% { transform: scale(1); } 40% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(14,124,107,0.25); } 100% { transform: scale(1); } }
+  .menu-item.added { animation: addPulse 0.4s ease-out; }
+  @keyframes cartBump { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .total-amount.bump { animation: cartBump 0.35s ease-out; }
+
+  /* SHORTCUTS HINT */
+  .shortcuts-hint { position: fixed; bottom: 20px; right: 20px; background: rgba(30,30,30,0.95); color: #fff; padding: 14px 18px; border-radius: 10px; font-size: 13px; z-index: 9998; display: none; max-width: 320px; line-height: 1.8; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .shortcuts-hint.show { display: block; }
+  .shortcuts-hint kbd { background: rgba(255,255,255,0.18); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: 11px; margin: 0 2px; font-weight: 600; }
+  .shortcuts-hint .close-hint { background: none; border: none; color: #999; cursor: pointer; float: right; font-size: 18px; margin: -4px -4px 0 10px; line-height: 1; }
+
+  /* TAX & TIP CONFIG ROW (on receipt page) */
+  .receipt-config { display: flex; gap: 14px; padding: 10px 16px; margin: 10px auto; max-width: 600px; background: rgba(0,0,0,0.04); border-radius: 8px; flex-wrap: wrap; justify-content: center; align-items: center; font-size: 14px; color: #555; }
+  .receipt-config label { display: flex; align-items: center; gap: 6px; }
+  .receipt-config input { width: 56px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; text-align: center; font-family: inherit; background: #fff; color: #333; }
+  body.dark .receipt-config { background: rgba(255,255,255,0.05); color: #aaa; }
+  body.dark .receipt-config input { background: #1f1f1f; border-color: #383838; color: #e8e8e8; }
+
+  /* SPLIT CHECK */
+  .split-info { padding: 10px 14px; margin-top: 12px; background: #faf6ee; border-radius: 8px; }
+  .split-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; color: #555; }
+  .split-row.total { font-weight: 700; color: #0e7c6b; border-top: 1px solid #e0dcd4; padding-top: 8px; margin-top: 4px; }
+  .split-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .split-controls .label { flex: 1; font-weight: 600; color: #444; }
+  .split-controls button { background: #fff; border: 1px solid #d6d1c7; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .split-controls button:hover { background: #0e7c6b; color: #fff; border-color: #0e7c6b; }
+  body.dark .split-info { background: #262626; }
+  body.dark .split-row { color: #aaa; }
+  body.dark .split-row.total { color: #2ddbbf; border-color: #383838; }
+  body.dark .split-controls .label { color: #ddd; }
+  body.dark .split-controls button { background: #1f1f1f; border-color: #383838; color: #e0e0e0; }
+
   /* UNDO TOAST */
   .undo-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120%); background: #1a1a1a; color: #fff; padding: 12px 16px 12px 20px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; z-index: 10000; transition: transform 0.25s cubic-bezier(.4,1.4,.6,1); max-width: 90vw; }
   .undo-toast.show { transform: translateX(-50%) translateY(0); }
@@ -427,8 +502,9 @@
   <!-- RIGHT -->
   <div class="order-side">
     <button class="mobile-back-btn" id="mobileBackBtn" onclick="showMobileMenu()">← Back to Menu</button>
+    <div class="tabs-bar" id="tabsBar"></div>
     <div class="order-header">
-      <h2>Order</h2>
+      <h2 id="orderHeading">Order</h2>
       <button class="clear-btn" id="clearBtn" onclick="clearOrder()">Clear All</button>
     </div>
     <div class="dine-in-info show" id="dineInInfo">
@@ -623,12 +699,20 @@
     <div class="r-divider"></div>
     <div id="rItems"></div>
     <div class="r-divider thick"></div>
+    <div class="r-total" id="rSubtotalRow" style="display:none;font-size:60px;"><span>SUBTOTAL</span><span id="rSubtotal"></span></div>
+    <div class="r-total" id="rTaxRow" style="display:none;font-size:60px;"><span id="rTaxLabel">TAX</span><span id="rTaxAmount"></span></div>
     <div class="r-total"><span>TOTAL</span><span class="r-total-amt" id="rTotal"></span></div>
+    <div id="rSplitSection" style="display:none;">
+      <div class="r-divider"></div>
+      <div class="r-tip-title">Split Check</div>
+      <div class="r-tip-row"><span id="rSplitLabel">Split 2 ways</span><span></span><span class="r-tip-total" id="rSplitAmount"></span></div>
+    </div>
     <div class="r-divider"></div>
     <div class="r-tip-section" id="rTipSection">
       <div class="r-tip-title">Suggested Gratuity</div>
       <div class="r-tip-row r-tip-header"><span>%</span><span>Tip</span><span class="r-tip-total">Tip + Total</span></div>
       <div class="r-tip-line" style="margin-top:4px"></div>
+      <div class="r-tip-row"><span>15%</span><span id="rTip15"></span><span class="r-tip-total" id="rWithTip15"></span></div>
       <div class="r-tip-row"><span>18%</span><span id="rTip18"></span><span class="r-tip-total" id="rWithTip18"></span></div>
       <div class="r-tip-row"><span>20%</span><span id="rTip20"></span><span class="r-tip-total" id="rWithTip20"></span></div>
       <div class="r-tip-row"><span>25%</span><span id="rTip25"></span><span class="r-tip-total" id="rWithTip25"></span></div>
@@ -637,6 +721,10 @@
     </div>
     <div class="r-divider"></div>
     <div class="r-footer">Thank you for your order!</div>
+  </div>
+  <div class="receipt-config">
+    <label>Tax %: <input type="number" id="taxRateInput" min="0" max="20" step="0.1" value="0" oninput="updateTaxRate(this.value)"></label>
+    <label>Split: <button onclick="changeSplit(-1)" style="background:#fff;border:1px solid #ccc;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;">−</button> <span id="splitDisplay" style="min-width:18px;text-align:center;font-weight:700;">1</span> <button onclick="changeSplit(1)" style="background:#fff;border:1px solid #ccc;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;">+</button></label>
   </div>
   <div class="receipt-actions">
     <button class="btn-back-order" onclick="backToOrder()">← Back to Order</button>
@@ -1002,12 +1090,24 @@ let activeCategory = "Appetizers";
 let orderType = "Dine In";
 let orderNumber = Math.floor(Math.random() * 9000) + 1000;
 
+// Multi-tab state — each tab is an open order/table
+// Tab shape: { id, label, order: [], orderType, pickupMinutes, tableNumber, guestCount, orderNumber }
+let tabs = [];
+let activeTabId = null;
+
 // Stock manager state
 let stockManagerMode = false;
 let unavailableItems = new Set();
 
 // Order history
 let orderHistory = [];
+
+// Favorites — set of "Category::ItemName"
+let favorites = new Set();
+
+// Tax rate (percentage) and tip presets
+let taxRate = 0; // 0 = no tax (Oregon default)
+let splitWays = 1; // split check ways
 
 // Spice modal state
 let pendingSpicyItem = null;
@@ -1094,6 +1194,14 @@ function getDateTime() {
 function renderCategories() {
   const bar = document.getElementById("catBar");
   bar.innerHTML = "";
+  // Favorites pseudo-category (only show if any favorites exist)
+  if (favorites.size > 0) {
+    const favBtn = document.createElement("button");
+    favBtn.className = "cat-btn" + (activeCategory === "★ Favorites" ? " active" : "");
+    favBtn.innerHTML = `★ Favorites <span style="opacity:0.7;font-weight:500;">(${favorites.size})</span>`;
+    favBtn.onclick = () => { haptic('light'); activeCategory = "★ Favorites"; document.getElementById("searchInput").value = ""; document.getElementById("searchClear").classList.remove("show"); document.getElementById("catBar").style.display = ""; renderCategories(); renderMenuItems(); };
+    bar.appendChild(favBtn);
+  }
   Object.keys(menu).forEach(cat => {
     const btn = document.createElement("button");
     btn.className = "cat-btn" + (cat === activeCategory ? " active" : "");
@@ -1143,6 +1251,28 @@ function renderMenuItems() {
     return;
   }
   
+  // Favorites view
+  if (activeCategory === "★ Favorites") {
+    if (favorites.size === 0) {
+      const empty = document.createElement("div");
+      empty.className = "search-results-label";
+      empty.textContent = "No favorites yet — tap ☆ on any menu item to add it.";
+      grid.appendChild(empty);
+      return;
+    }
+    // Group by source category
+    Object.keys(menu).forEach(cat => {
+      const favs = menu[cat].filter(item => favorites.has(`${cat}::${item.name}`));
+      if (favs.length === 0) return;
+      const header = document.createElement("div");
+      header.className = "menu-section-header";
+      header.textContent = cat;
+      grid.appendChild(header);
+      favs.forEach(item => renderMenuItem(grid, item, cat));
+    });
+    return;
+  }
+  
   // Normal category view
   let currentSection = null;
   (menu[activeCategory] || []).forEach(item => {
@@ -1162,9 +1292,16 @@ function renderMenuItem(grid, item, category) {
   div.className = "menu-item";
   const itemKey = `${category}::${item.name}`;
   const isUnavailable = unavailableItems.has(itemKey);
+  const isFav = favorites.has(itemKey);
   if (isUnavailable) div.classList.add("unavailable");
   
-  div.onclick = () => {
+  div.onclick = (e) => {
+    // Clicks on the star toggle favorite instead of adding
+    if (e.target.classList.contains("fav-star")) {
+      e.stopPropagation();
+      toggleFavorite(itemKey);
+      return;
+    }
     // In stock manager mode, click toggles availability instead of adding to cart
     if (stockManagerMode) {
       haptic('medium');
@@ -1186,6 +1323,11 @@ function renderMenuItem(grid, item, category) {
     activeCategory = category;
     addItemToOrder(item); 
     activeCategory = prevCat;
+    // Visual feedback (works for desktop and mobile)
+    div.classList.remove("added"); void div.offsetWidth;
+    div.classList.add("added");
+    const totalEl = document.getElementById("totalAmount");
+    if (totalEl) { totalEl.classList.remove("bump"); void totalEl.offsetWidth; totalEl.classList.add("bump"); }
   };
   
   let priceText = item.perPerson ? fp(item.price) + " /person" : fp(item.price);
@@ -1203,8 +1345,62 @@ function renderMenuItem(grid, item, category) {
     }
   }
   
-  div.innerHTML = `<div class="item-name">${nameHTML}</div><div class="item-price">${priceText}</div>${subtitleHTML}`;
+  const starBtn = `<button class="fav-star ${isFav ? 'active' : ''}" aria-label="${isFav ? 'Unfavorite' : 'Favorite'} ${item.name}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>`;
+  div.innerHTML = `${starBtn}<div class="item-name">${nameHTML}</div><div class="item-price">${priceText}</div>${subtitleHTML}`;
   grid.appendChild(div);
+}
+
+// ─── FAVORITES ───
+const FAVORITES_STORAGE_KEY = 'fourSeasonFavorites';
+function saveFavorites() { try { localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favorites))); } catch(e) {} }
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) return;
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) favorites = new Set(arr);
+  } catch(e) {}
+}
+function toggleFavorite(itemKey) {
+  haptic('light');
+  if (favorites.has(itemKey)) favorites.delete(itemKey);
+  else favorites.add(itemKey);
+  saveFavorites();
+  renderCategories();
+  renderMenuItems();
+}
+
+// ─── TAX RATE ───
+const TAX_STORAGE_KEY = 'fourSeasonTaxRate';
+function saveTaxRate() { try { localStorage.setItem(TAX_STORAGE_KEY, String(taxRate)); } catch(e) {} }
+function loadTaxRate() {
+  try {
+    const raw = localStorage.getItem(TAX_STORAGE_KEY);
+    if (raw != null) {
+      const n = parseFloat(raw);
+      if (!isNaN(n) && n >= 0 && n <= 30) taxRate = n;
+    }
+  } catch(e) {}
+}
+function updateTaxRate(val) {
+  const n = parseFloat(val);
+  if (isNaN(n) || n < 0 || n > 30) return;
+  taxRate = n;
+  saveTaxRate();
+  // Re-render receipt if open
+  if (document.getElementById("receiptPage").classList.contains("show")) {
+    _renderReceiptCard();
+  }
+}
+
+// ─── SPLIT CHECK ───
+function changeSplit(delta) {
+  haptic('light');
+  splitWays = Math.max(1, Math.min(20, splitWays + delta));
+  document.getElementById("splitDisplay").textContent = splitWays;
+  if (document.getElementById("receiptPage").classList.contains("show")) {
+    _renderReceiptCard();
+  }
 }
 
 // Search functionality
@@ -2008,19 +2204,35 @@ function clearOrder() {
   if (order.length === 0) return;
   if (!confirm("Clear the entire order? This can't be undone.")) return;
   haptic('error');
-  order = [];
+  // Mutate in place so the active tab's reference stays valid
+  order.length = 0;
   _prevOrderTotal = 0;
   renderOrder();
 }
 
 // ─── CART PERSISTENCE ───
 const CART_STORAGE_KEY = 'fourSeasonCart';
+
+// Sync the live `order` array (and order-related fields) into the active tab object
+function syncActiveTabFromGlobals() {
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  tab.order = order;
+  tab.orderType = orderType;
+  tab.pickupMinutes = pickupMinutes;
+  tab.orderNumber = orderNumber;
+  const tNum = document.getElementById("tableNumber");
+  const gCount = document.getElementById("guestCount");
+  if (tNum) tab.tableNumber = tNum.value;
+  if (gCount) tab.guestCount = gCount.value;
+}
+
 function saveCart() {
+  syncActiveTabFromGlobals();
   try {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({
-      order: order,
-      orderType: orderType,
-      pickupMinutes: pickupMinutes,
+      tabs: tabs,
+      activeTabId: activeTabId,
       timestamp: Date.now()
     }));
   } catch(e) {}
@@ -2029,17 +2241,176 @@ function saveCart() {
 function loadCart() {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) { initFirstTab(); return; }
     const data = JSON.parse(raw);
     // Discard carts older than 12 hours
     if (data.timestamp && Date.now() - data.timestamp > 12 * 60 * 60 * 1000) {
       localStorage.removeItem(CART_STORAGE_KEY);
+      initFirstTab();
       return;
     }
-    if (Array.isArray(data.order)) order = data.order;
-    if (data.orderType) orderType = data.orderType;
-    if (typeof data.pickupMinutes === 'number') pickupMinutes = data.pickupMinutes;
-  } catch(e) {}
+    // New multi-tab format
+    if (Array.isArray(data.tabs) && data.tabs.length > 0) {
+      tabs = data.tabs;
+      activeTabId = data.activeTabId && tabs.find(t => t.id === data.activeTabId)
+        ? data.activeTabId
+        : tabs[0].id;
+      activateTab(activeTabId, /*skipRender*/ true);
+      return;
+    }
+    // Legacy single-cart format
+    if (Array.isArray(data.order)) {
+      initFirstTab();
+      const tab = tabs[0];
+      tab.order = data.order;
+      if (data.orderType) tab.orderType = data.orderType;
+      if (typeof data.pickupMinutes === 'number') tab.pickupMinutes = data.pickupMinutes;
+      activateTab(tab.id, /*skipRender*/ true);
+      return;
+    }
+    initFirstTab();
+  } catch(e) { initFirstTab(); }
+}
+
+function initFirstTab() {
+  if (tabs.length === 0) {
+    const t = createNewTab("Order 1");
+    activeTabId = t.id;
+    activateTab(activeTabId, /*skipRender*/ true);
+  }
+}
+
+let _tabIdCounter = 1;
+function makeTabId() {
+  return "tab-" + Date.now() + "-" + (_tabIdCounter++);
+}
+
+function createNewTab(label) {
+  const id = makeTabId();
+  const newNum = Math.floor(Math.random() * 9000) + 1000;
+  const tab = {
+    id: id,
+    label: label || `Order ${tabs.length + 1}`,
+    order: [],
+    orderType: "Dine In",
+    pickupMinutes: 10,
+    tableNumber: "",
+    guestCount: "",
+    orderNumber: newNum,
+  };
+  tabs.push(tab);
+  return tab;
+}
+
+function activateTab(id, skipRender) {
+  syncActiveTabFromGlobals();
+  const tab = tabs.find(t => t.id === id);
+  if (!tab) return;
+  activeTabId = id;
+  // Restore globals from this tab
+  order = tab.order;
+  orderType = tab.orderType || "Dine In";
+  pickupMinutes = typeof tab.pickupMinutes === 'number' ? tab.pickupMinutes : 10;
+  orderNumber = tab.orderNumber || orderNumber;
+  // Restore UI fields
+  const tNum = document.getElementById("tableNumber");
+  const gCount = document.getElementById("guestCount");
+  if (tNum) tNum.value = tab.tableNumber || "";
+  if (gCount) gCount.value = tab.guestCount || "";
+  const pickupDisplay = document.getElementById("pickupTimeDisplay");
+  if (pickupDisplay) pickupDisplay.textContent = pickupMinutes + " min";
+  // Sync orderType toggle UI
+  document.querySelectorAll('#orderTypeToggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-type') === orderType);
+  });
+  const dineInInfo = document.getElementById("dineInInfo");
+  const pickupInfo = document.getElementById("pickupInfo");
+  if (dineInInfo && pickupInfo) {
+    if (orderType === "Dine In") { dineInInfo.classList.add("show"); pickupInfo.classList.remove("show"); }
+    else { dineInInfo.classList.remove("show"); pickupInfo.classList.add("show"); }
+  }
+  if (!skipRender) {
+    renderTabs();
+    renderOrder();
+  }
+}
+
+function addNewTab() {
+  haptic('light');
+  syncActiveTabFromGlobals();
+  const t = createNewTab();
+  activateTab(t.id);
+}
+
+function renameTab(id) {
+  const tab = tabs.find(t => t.id === id);
+  if (!tab) return;
+  const newLabel = prompt("Rename this tab:", tab.label);
+  if (newLabel && newLabel.trim()) {
+    tab.label = newLabel.trim().slice(0, 30);
+    renderTabs();
+    saveCart();
+  }
+}
+
+function closeTab(id, force) {
+  const tab = tabs.find(t => t.id === id);
+  if (!tab) return;
+  const hasItems = tab.order && tab.order.length > 0;
+  if (hasItems && !force) {
+    if (!confirm(`Close "${tab.label}"? It has ${tab.order.length} item${tab.order.length !== 1 ? 's' : ''} that will be discarded.`)) return;
+  }
+  haptic('error');
+  const idx = tabs.findIndex(t => t.id === id);
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    initFirstTab();
+  } else if (activeTabId === id) {
+    const newActive = tabs[Math.min(idx, tabs.length - 1)];
+    activateTab(newActive.id);
+  } else {
+    renderTabs();
+  }
+  saveCart();
+}
+
+function renderTabs() {
+  const bar = document.getElementById("tabsBar");
+  if (!bar) return;
+  bar.innerHTML = "";
+  tabs.forEach(tab => {
+    const chip = document.createElement("button");
+    chip.className = "tab-chip" + (tab.id === activeTabId ? " active" : "");
+    const count = tab.order.reduce((s, i) => s + i.qty, 0);
+    // Auto-label preference: if user named the tab use it, else use table number if set
+    let displayLabel = tab.label;
+    if (tab.orderType === "Dine In" && tab.tableNumber && /^Order \d+$/.test(tab.label)) {
+      displayLabel = `Table ${tab.tableNumber}`;
+    }
+    chip.innerHTML = `
+      <span class="tab-label" title="${displayLabel}">${displayLabel}</span>
+      ${count > 0 ? `<span class="tab-count">${count}</span>` : ''}
+      <span class="tab-close" title="Close tab">×</span>
+    `;
+    chip.onclick = (e) => {
+      if (e.target.classList.contains("tab-close")) {
+        e.stopPropagation();
+        closeTab(tab.id);
+      } else if (e.detail === 2) {
+        // double-click to rename
+        renameTab(tab.id);
+      } else {
+        if (tab.id !== activeTabId) { haptic('light'); activateTab(tab.id); }
+      }
+    };
+    bar.appendChild(chip);
+  });
+  const addBtn = document.createElement("button");
+  addBtn.className = "tab-add";
+  addBtn.title = "New order / table";
+  addBtn.textContent = "+";
+  addBtn.onclick = addNewTab;
+  bar.appendChild(addBtn);
 }
 
 // ─── STOCK MANAGER ───
@@ -2253,6 +2624,7 @@ function renderOrder() {
   }
   _prevOrderTotal = currentTotal;
   saveCart();
+  renderTabs();
 
   const container = document.getElementById("orderItems");
   const isEmpty = order.length === 0;
@@ -2262,11 +2634,27 @@ function renderOrder() {
   document.getElementById("clearBtn").classList.toggle("show", !isEmpty);
   document.getElementById("printBtn").classList.toggle("enabled", !isEmpty);
   
-  // Remove only order rows, preserving the emptyState div
-  container.querySelectorAll(".order-row").forEach(r => r.remove());
+  // Remove only order rows and course headers, preserving the emptyState div
+  container.querySelectorAll(".order-row, .course-header").forEach(r => r.remove());
   
   if (!isEmpty) {
+    // For Dine In, group by course. For Take Out, render flat.
+    const useCourses = orderType === "Dine In";
+    const COURSES = ["Appetizer", "Entrée", "Dessert"];
+    const groups = useCourses
+      ? { "Appetizer": [], "Entrée": [], "Dessert": [], "Other": [] }
+      : { all: [] };
+    
     order.forEach((item, idx) => {
+      if (useCourses) {
+        const c = item.course && COURSES.includes(item.course) ? item.course : "Other";
+        groups[c].push({ item, idx });
+      } else {
+        groups.all.push({ item, idx });
+      }
+    });
+    
+    const renderRow = ({ item, idx }) => {
       const row = document.createElement("div");
       row.className = "order-row";
       
@@ -2308,6 +2696,15 @@ function renderOrder() {
         customTag = `<div class="custom-tag">${item.customizationSummary}</div>`;
       }
       
+      // Course pills (Dine In only)
+      let courseSelector = "";
+      if (useCourses) {
+        const currentCourse = item.course || "";
+        courseSelector = `<div class="course-selector">` +
+          COURSES.map(c => `<button class="course-pill ${currentCourse === c ? 'active' : ''}" onclick="setCourse(${idx}, '${c}')">${c}</button>`).join('') +
+          `</div>`;
+      }
+      
       const hasNote = item.note && item.note.trim().length > 0;
       const noteRowId = `note-row-${idx}`;
       const noteInputId = `note-input-${idx}`;
@@ -2320,6 +2717,7 @@ function renderOrder() {
               ${spiceTag}${riceTag}${sauceTag}
               ${customTag}
               ${hasNote ? `<div class="note-display">📝 ${item.note}</div>` : ''}
+              ${courseSelector}
             </div>
             <button class="remove-btn" onclick="removeItem(${idx})" aria-label="Remove ${item.name}" title="Remove item">×</button>
           </div>
@@ -2338,7 +2736,25 @@ function renderOrder() {
         </div>
       `;
       container.appendChild(row);
-    });
+    };
+    
+    if (useCourses) {
+      // Render in course order, only show non-empty groups
+      const order_courses = [...COURSES, "Other"];
+      order_courses.forEach(courseName => {
+        const rows = groups[courseName];
+        if (!rows || rows.length === 0) return;
+        const header = document.createElement("div");
+        header.className = "course-header";
+        const label = courseName === "Other" ? "Uncategorized" : courseName;
+        header.innerHTML = `<span>${label} · ${rows.length} item${rows.length !== 1 ? 's' : ''}</span>` +
+          (courseName !== "Other" ? `<button class="course-fire-btn" onclick="fireCourse('${courseName}')">🔥 Fire</button>` : '');
+        container.appendChild(header);
+        rows.forEach(renderRow);
+      });
+    } else {
+      groups.all.forEach(renderRow);
+    }
 
     const count = order.reduce((s, i) => s + i.qty, 0);
     document.getElementById("metaCount").textContent = count + " item" + (count !== 1 ? "s" : "");
@@ -2350,6 +2766,28 @@ function renderOrder() {
   updateMobileCartBadge();
 }
 
+// Course tagging
+function setCourse(idx, course) {
+  if (!order[idx]) return;
+  haptic('light');
+  // Toggle off if same course clicked again
+  if (order[idx].course === course) {
+    delete order[idx].course;
+  } else {
+    order[idx].course = course;
+  }
+  renderOrder();
+}
+
+function fireCourse(courseName) {
+  const items = order.filter(it => (it.course || "Other") === courseName || (courseName === "Other" && !it.course));
+  if (items.length === 0) return;
+  const itemList = items.map(it => `${it.qty}× ${it.name}`).join("\n");
+  if (!confirm(`Fire ${courseName} to kitchen?\n\n${itemList}\n\nThis will print a kitchen ticket for these items only.`)) return;
+  // Print a kitchen ticket for just these items
+  printKitchenTicketForItems(items, `${courseName} — Fire`);
+}
+
 function completeOrder() {
   if (order.length === 0) return;
   const total = order.reduce((s, i) => s + i.price * i.qty, 0);
@@ -2357,6 +2795,12 @@ function completeOrder() {
   if (!confirm(`Send this order to the kitchen?\n\n${count} item${count !== 1 ? 's' : ''} — ${fp(total)}`)) return;
   haptic('success');
 
+  // Sync tax rate input to current value, reset split for new receipt
+  const taxInput = document.getElementById("taxRateInput");
+  if (taxInput) taxInput.value = taxRate;
+  splitWays = 1;
+  document.getElementById("splitDisplay").textContent = splitWays;
+  
   _renderReceiptCard();
   // Record in history
   recordOrderInHistory();
@@ -2367,20 +2811,45 @@ function completeOrder() {
 }
 
 function _renderReceiptCard() {
-  const total = order.reduce((s, i) => s + i.price * i.qty, 0);
+  const subtotal = order.reduce((s, i) => s + i.price * i.qty, 0);
+  const taxAmount = subtotal * (taxRate / 100);
+  const total = subtotal + taxAmount;
 
   document.getElementById("rOrderNum").textContent = "Order #" + orderNumber;
   document.getElementById("rOrderType").textContent = orderType;
   document.getElementById("rTime").textContent = getDateTime();
   document.getElementById("rTotal").textContent = fp(total);
   
-  // Tip suggestions
+  // Show/hide subtotal and tax rows
+  const showTax = taxRate > 0;
+  document.getElementById("rSubtotalRow").style.display = showTax ? "flex" : "none";
+  document.getElementById("rTaxRow").style.display = showTax ? "flex" : "none";
+  if (showTax) {
+    document.getElementById("rSubtotal").textContent = fp(subtotal);
+    document.getElementById("rTaxLabel").textContent = `TAX (${taxRate}%)`;
+    document.getElementById("rTaxAmount").textContent = fp(taxAmount);
+  }
+  
+  // Split check
+  const splitSection = document.getElementById("rSplitSection");
+  if (splitWays > 1) {
+    splitSection.style.display = "block";
+    document.getElementById("rSplitLabel").textContent = `Split ${splitWays} ways`;
+    document.getElementById("rSplitAmount").textContent = fp(total / splitWays) + " /person";
+  } else {
+    splitSection.style.display = "none";
+  }
+  
+  // Tip suggestions (on total including tax)
+  const tip15 = total * 0.15;
   const tip18 = total * 0.18;
   const tip20 = total * 0.20;
   const tip25 = total * 0.25;
+  document.getElementById("rTip15").textContent = fp(tip15);
   document.getElementById("rTip18").textContent = fp(tip18);
   document.getElementById("rTip20").textContent = fp(tip20);
   document.getElementById("rTip25").textContent = fp(tip25);
+  document.getElementById("rWithTip15").textContent = fp(total + tip15);
   document.getElementById("rWithTip18").textContent = fp(total + tip18);
   document.getElementById("rWithTip20").textContent = fp(total + tip20);
   document.getElementById("rWithTip25").textContent = fp(total + tip25);
@@ -2461,9 +2930,12 @@ function printReceipt() {
 function printReceiptDirect() { printReceipt(); }
 
 function printKitchenTicket() {
+  printKitchenTicketForItems(order);
+}
+
+function printKitchenTicketForItems(items, subtitle) {
   haptic('success');
-  // Build kitchen-only HTML: items, qty, modifiers, notes — NO prices
-  const items = order; // or whatever order is currently loaded
+  if (!items || items.length === 0) return;
   const now = new Date();
   const timeStr = now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   const tableNum = document.getElementById("tableNumber")?.value || "";
@@ -2472,6 +2944,7 @@ function printKitchenTicket() {
   let header = `
     <div class="k-header">
       <div class="k-title">*** KITCHEN ***</div>
+      ${subtitle ? `<div class="k-meta" style="font-size:62px;-webkit-text-stroke:3px #000;">${subtitle}</div>` : ''}
       <div class="k-order">Order #${orderNumber}</div>
       <div class="k-meta">${orderType}${tableNum ? ' — Table ' + tableNum : ''}${guestCount ? ' — ' + guestCount + ' guest' + (guestCount !== '1' ? 's' : '') : ''}</div>
       <div class="k-time">${timeStr}</div>
@@ -2491,6 +2964,7 @@ function printKitchenTicket() {
     if (item.spiceLevel) mods.push(item.spiceLevel.toUpperCase());
     if (item.riceChoice) mods.push(item.riceChoice);
     if (item.sauceSize) mods.push(item.sauceSize);
+    if (item.course) mods.push("Course: " + item.course);
     const modText = mods.length ? `<div class="k-mod">→ ${mods.join(' · ')}</div>` : '';
     const customText = item.customizationSummary ? `<div class="k-mod">→ ${item.customizationSummary}</div>` : '';
     const noteText = (item.note && item.note.trim()) ? `<div class="k-note">★ NOTE: ${item.note.toUpperCase()}</div>` : '';
@@ -2540,13 +3014,23 @@ function backToOrder() {
 
 function newOrder() {
   haptic('success');
+  // Reset the active tab to a fresh state
   order = [];
   _prevOrderTotal = 0;
-  orderNumber++;
+  orderNumber = Math.floor(Math.random() * 9000) + 1000;
   document.getElementById("tableNumber").value = "";
   document.getElementById("guestCount").value = "";
   pickupMinutes = 10;
   document.getElementById("pickupTimeDisplay").textContent = "10 min";
+  // Reset the active tab's metadata so the label can auto-update
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (tab) {
+    tab.order = order;
+    tab.orderNumber = orderNumber;
+    tab.tableNumber = "";
+    tab.guestCount = "";
+    tab.pickupMinutes = 10;
+  }
   document.getElementById("receiptPage").classList.remove("show");
   document.body.classList.remove("receipt-open");
   document.getElementById("mainView").style.display = "";
@@ -2581,6 +3065,76 @@ document.getElementById("orderTypeToggle").addEventListener("click", function(e)
     renderOrder();
   }
 });
+
+// Update tab label when table number changes
+document.getElementById("tableNumber").addEventListener("input", function() {
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (tab) { tab.tableNumber = this.value; renderTabs(); saveCart(); }
+});
+document.getElementById("guestCount").addEventListener("input", function() {
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (tab) { tab.guestCount = this.value; saveCart(); }
+});
+
+// ─── KEYBOARD SHORTCUTS ───
+document.addEventListener("keydown", function(e) {
+  // Ignore if typing in a text field
+  const tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
+  // Ignore if any modal is open
+  const anyModalOpen = ["spiceModal","comboModal","riceModal","sauceModal","familyModal","historyOverlay"].some(id => {
+    const el = document.getElementById(id);
+    return el && el.classList.contains("show");
+  });
+  if (anyModalOpen) return;
+  
+  // "/" focuses the search bar
+  if (e.key === "/") {
+    e.preventDefault();
+    document.getElementById("searchInput").focus();
+    return;
+  }
+  // "n" new tab
+  if (e.key === "n" || e.key === "N") {
+    e.preventDefault();
+    addNewTab();
+    return;
+  }
+  // "?" shows shortcut hint
+  if (e.key === "?") {
+    e.preventDefault();
+    toggleShortcutsHint();
+    return;
+  }
+  // Ctrl/Cmd+Tab → next tab (browser intercepts; use Alt+number instead)
+  // Alt+1..9 switch tab
+  if (e.altKey && /^[1-9]$/.test(e.key)) {
+    e.preventDefault();
+    const idx = parseInt(e.key) - 1;
+    if (tabs[idx]) activateTab(tabs[idx].id);
+    return;
+  }
+});
+
+function toggleShortcutsHint() {
+  let hint = document.getElementById("shortcutsHint");
+  if (!hint) {
+    hint = document.createElement("div");
+    hint.id = "shortcutsHint";
+    hint.className = "shortcuts-hint";
+    hint.innerHTML = `
+      <button class="close-hint" onclick="toggleShortcutsHint()">×</button>
+      <strong>Keyboard shortcuts</strong><br>
+      <kbd>/</kbd> Search menu<br>
+      <kbd>N</kbd> New tab<br>
+      <kbd>Alt</kbd>+<kbd>1-9</kbd> Switch tab<br>
+      <kbd>Esc</kbd> Close modal<br>
+      <kbd>?</kbd> Toggle this help
+    `;
+    document.body.appendChild(hint);
+  }
+  hint.classList.toggle("show");
+}
 
 // Escape key closes any open modal
 document.addEventListener("keydown", function(e) {
@@ -2708,17 +3262,20 @@ function initTheme() {
 
 // Init
 initTheme();
-loadCart();
 loadUnavailable();
 loadHistory();
 updateHistoryBadge();
-// Sync orderType toggle UI with loaded value
-document.querySelectorAll('#orderTypeToggle button').forEach(btn => {
-  btn.classList.toggle('active', btn.getAttribute('data-type') === orderType);
-});
+loadFavorites();
+loadTaxRate();
+// Sync tax input with stored value
+const _taxInput = document.getElementById("taxRateInput");
+if (_taxInput) _taxInput.value = taxRate;
+loadCart(); // creates tabs[] and activates a tab; handles syncing UI fields
+// Note: loadCart already handles orderType toggle sync via activateTab
 updateClock();
 renderCategories();
 renderMenuItems();
+renderTabs();
 renderOrder();
 </script>
 </body>

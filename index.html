@@ -607,6 +607,103 @@
   body.dark .sauce-tag.free { background: #15302a; color: #6bd6a0; border-color: #1f4a3d; }
   body.dark .sauce-tag.paid { background: #2a2418; color: #f0c060; border-color: #4a3a1f; }
   body.dark .rice-tag { background: #15302a; color: #6bd6a0; border-color: #1f4a3d; }
+
+  /* HANDWRITTEN TICKET SCANNER */
+  .scanner-modal { background: #f8f5ef; border-radius: 18px; width: min(1120px, 96vw); height: min(900px, 94vh); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,0.35); }
+  .scanner-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; background: #fff; border-bottom: 1px solid #e5dfd5; }
+  .scanner-header-copy h3 { font-size: 22px; color: #202020; margin-bottom: 3px; }
+  .scanner-header-copy p { font-size: 13px; color: #777; }
+  .scanner-close { width: 38px; height: 38px; border-radius: 50%; border: 1px solid #ddd6cb; background: #f7f3ed; color: #555; font-size: 25px; cursor: pointer; line-height: 1; }
+  .scanner-body { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(320px, 0.8fr) minmax(440px, 1.2fr); }
+  .scanner-capture { padding: 20px; overflow-y: auto; border-right: 1px solid #e5dfd5; background: #fff; }
+  .scanner-review { padding: 20px; overflow-y: auto; background: #f8f5ef; }
+  .scanner-section-title { font-size: 12px; font-weight: 800; color: #0e7c6b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .scanner-dropzone { position: relative; min-height: 260px; border: 2px dashed #b9d5cf; border-radius: 14px; background: #f2faf8; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .scanner-dropzone:hover, .scanner-dropzone.dragover { border-color: #0e7c6b; background: #e7f7f3; }
+  .scanner-dropzone img { display: none; width: 100%; height: 100%; max-height: 430px; object-fit: contain; background: #181818; }
+  .scanner-dropzone.has-image img { display: block; }
+  .scanner-dropzone.has-image .scanner-drop-copy { display: none; }
+  .scanner-drop-copy { text-align: center; padding: 28px; color: #547069; }
+  .scanner-drop-icon { font-size: 44px; margin-bottom: 10px; }
+  .scanner-drop-copy strong { display: block; font-size: 17px; color: #215e53; margin-bottom: 5px; }
+  .scanner-drop-copy span { display: block; font-size: 13px; line-height: 1.45; }
+  .scanner-file-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .scanner-button { border: none; border-radius: 10px; padding: 11px 14px; font: 700 14px inherit; cursor: pointer; transition: transform 0.1s, opacity 0.15s; }
+  .scanner-button:active { transform: scale(0.98); }
+  .scanner-button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .scanner-button.primary { background: #0e7c6b; color: #fff; }
+  .scanner-button.secondary { background: #fff; color: #0e7c6b; border: 1px solid #9accc3; }
+  .scanner-button.neutral { background: #e9e4dc; color: #555; }
+  .scanner-button.danger { background: #fff; color: #b43a2f; border: 1px solid #e4aaa4; }
+  .scanner-config { margin-top: 18px; padding: 15px; border: 1px solid #e3ddd3; border-radius: 12px; background: #fbfaf7; }
+  .scanner-config-note { font-size: 12px; line-height: 1.45; color: #777; margin-bottom: 12px; }
+  .scanner-config-note strong { color: #555; }
+  .scanner-field { margin-bottom: 10px; }
+  .scanner-field:last-child { margin-bottom: 0; }
+  .scanner-field label { display: block; font-size: 11px; font-weight: 800; color: #68635b; text-transform: uppercase; letter-spacing: 0.45px; margin-bottom: 5px; }
+  .scanner-field input, .scanner-field select, .scanner-item-card input, .scanner-item-card select, .scanner-review-summary input, .scanner-review-summary select { width: 100%; padding: 9px 10px; border: 1px solid #d8d1c7; border-radius: 8px; background: #fff; color: #262626; font: 500 13px inherit; }
+  .scanner-field input:focus, .scanner-field select:focus, .scanner-item-card input:focus, .scanner-item-card select:focus, .scanner-review-summary input:focus, .scanner-review-summary select:focus { outline: none; border-color: #0e7c6b; box-shadow: 0 0 0 2px rgba(14,124,107,0.15); }
+  .scanner-key-wrap { position: relative; }
+  .scanner-key-wrap input { padding-right: 64px; }
+  .scanner-key-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; color: #0e7c6b; font: 700 11px inherit; cursor: pointer; }
+  .scanner-analyze { width: 100%; padding: 14px; margin-top: 14px; font-size: 16px; }
+  .scanner-status { display: none; margin-top: 12px; border-radius: 9px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+  .scanner-status.show { display: block; }
+  .scanner-status.working { background: #eef8f6; color: #0a6859; border: 1px solid #b9ded7; }
+  .scanner-status.success { background: #effaf2; color: #216a36; border: 1px solid #b9dfc4; }
+  .scanner-status.error { background: #fff1ef; color: #a03227; border: 1px solid #efb3ad; }
+  .scanner-working-line { display: flex; align-items: center; gap: 9px; }
+  .scanner-spinner { width: 16px; height: 16px; border: 2px solid rgba(14,124,107,0.25); border-top-color: #0e7c6b; border-radius: 50%; animation: scannerSpin 0.75s linear infinite; flex: 0 0 auto; }
+  @keyframes scannerSpin { to { transform: rotate(360deg); } }
+  .scanner-empty-review { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #958e84; padding: 35px; }
+  .scanner-empty-review .icon { font-size: 44px; margin-bottom: 12px; }
+  .scanner-empty-review strong { color: #615b54; font-size: 17px; margin-bottom: 6px; }
+  .scanner-empty-review span { font-size: 13px; max-width: 360px; line-height: 1.5; }
+  .scanner-review-summary { padding: 14px; border-radius: 12px; background: #fff; border: 1px solid #e2dcd2; margin-bottom: 12px; }
+  .scanner-summary-grid { display: grid; grid-template-columns: 140px 1fr; gap: 10px; }
+  .scanner-summary-flags { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee9e1; }
+  .scanner-flag { display: flex; gap: 7px; align-items: flex-start; font-size: 12px; line-height: 1.4; color: #7c4c1f; background: #fff7e8; border: 1px solid #f1d7ac; border-radius: 7px; padding: 7px 9px; margin-top: 5px; }
+  .scanner-item-list { display: flex; flex-direction: column; gap: 10px; }
+  .scanner-item-card { background: #fff; border: 1px solid #ddd7cd; border-left: 5px solid #43a78f; border-radius: 12px; padding: 13px; }
+  .scanner-item-card.needs-review { border-left-color: #e29a32; background: #fffdf8; }
+  .scanner-item-card.low-confidence { border-left-color: #cf5145; }
+  .scanner-item-top { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; margin-bottom: 10px; }
+  .scanner-import-check { width: 20px !important; height: 20px; margin-top: 1px; accent-color: #0e7c6b; }
+  .scanner-raw-line { font: 700 15px/1.35 inherit; color: #262626; }
+  .scanner-item-number { font-size: 11px; color: #9b9388; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .scanner-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.35px; white-space: nowrap; }
+  .scanner-badge.high { color: #17643a; background: #e5f7eb; }
+  .scanner-badge.medium { color: #8b5a12; background: #fff1ce; }
+  .scanner-badge.low { color: #9d2f25; background: #ffe4e0; }
+  .scanner-item-grid { display: grid; grid-template-columns: 84px minmax(190px, 1fr) 115px 130px; gap: 8px; }
+  .scanner-item-grid .wide { grid-column: span 2; }
+  .scanner-mini-label { display: block; font-size: 10px; color: #7c756b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .scanner-candidates { margin-top: 8px; padding: 8px 10px; background: #fff6e8; border: 1px solid #f0d1a5; border-radius: 8px; color: #765025; font-size: 12px; line-height: 1.4; }
+  .scanner-results-actions { position: sticky; bottom: -20px; display: grid; grid-template-columns: 1fr 1fr 1.35fr; gap: 8px; padding: 14px 0 2px; margin-top: 12px; background: linear-gradient(to bottom, rgba(248,245,239,0), #f8f5ef 20%); }
+  .scanner-privacy { margin-top: 10px; font-size: 11px; color: #8b857d; line-height: 1.4; text-align: center; }
+  body.dark .scanner-modal, body.dark .scanner-review { background: #171717; }
+  body.dark .scanner-header, body.dark .scanner-capture, body.dark .scanner-review-summary, body.dark .scanner-item-card { background: #222; border-color: #383838; }
+  body.dark .scanner-header-copy h3, body.dark .scanner-raw-line { color: #f2f2f2; }
+  body.dark .scanner-header-copy p, body.dark .scanner-empty-review, body.dark .scanner-config-note { color: #9c9c9c; }
+  body.dark .scanner-capture { border-color: #383838; }
+  body.dark .scanner-dropzone { background: #18302b; border-color: #315d54; }
+  body.dark .scanner-drop-copy strong { color: #65d3bd; }
+  body.dark .scanner-drop-copy { color: #a2bbb6; }
+  body.dark .scanner-config { background: #1d1d1d; border-color: #383838; }
+  body.dark .scanner-field input, body.dark .scanner-field select, body.dark .scanner-item-card input, body.dark .scanner-item-card select, body.dark .scanner-review-summary input, body.dark .scanner-review-summary select { background: #2a2a2a; color: #eee; border-color: #444; }
+  body.dark .scanner-item-card.needs-review { background: #27231c; }
+  body.dark .scanner-results-actions { background: linear-gradient(to bottom, rgba(23,23,23,0), #171717 20%); }
+  @media (max-width: 820px) {
+    .scanner-modal { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; }
+    .scanner-body { display: block; overflow-y: auto; }
+    .scanner-capture, .scanner-review { overflow: visible; border-right: none; }
+    .scanner-capture { border-bottom: 1px solid #e5dfd5; }
+    .scanner-item-grid { grid-template-columns: 80px 1fr; }
+    .scanner-item-grid .wide { grid-column: 1 / -1; }
+    .scanner-summary-grid { grid-template-columns: 1fr; }
+    .scanner-results-actions { bottom: 0; grid-template-columns: 1fr 1fr; }
+    .scanner-results-actions .primary { grid-column: 1 / -1; grid-row: 1; }
+  }
 </style>
 </head>
 <body>
@@ -625,6 +722,7 @@
           <button class="active" data-type="Dine In">Dine In</button>
           <button data-type="Take Out">Take Out</button>
         </div>
+        <button class="topbar-btn" id="scanTicketBtn" onclick="openTicketScanner()" aria-label="Scan handwritten order ticket" title="Scan a handwritten ticket">📷 Scan Ticket</button>
         <button class="topbar-btn" id="historyBtn" onclick="openHistory()" aria-label="Order history" title="Order history">📋 History<span class="badge" id="historyBadge" style="display:none">0</span></button>
         <button class="topbar-btn" id="tabsOverviewBtn" onclick="openTabsOverview()" aria-label="Open tabs overview" title="View all open tabs">📑 Tabs<span class="badge" id="tabsBadge" style="display:none">0</span></button>
         <button class="topbar-btn" id="reportsBtn" onclick="openReports()" aria-label="Daily reports" title="Today's sales">📊 Reports</button>
@@ -901,6 +999,81 @@
       <button class="history-close" onclick="closeSettings()" aria-label="Close">×</button>
     </div>
     <div class="history-list" id="settingsContent" style="padding:18px;"></div>
+  </div>
+</div>
+
+<!-- HANDWRITTEN TICKET SCANNER -->
+<div class="history-overlay" id="ticketScannerOverlay" onclick="if(event.target===this)closeTicketScanner()">
+  <div class="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="ticketScannerTitle">
+    <div class="scanner-header">
+      <div class="scanner-header-copy">
+        <h3 id="ticketScannerTitle">Handwritten Ticket Scanner</h3>
+        <p>Photograph, review, and confirm every line before adding it to the order.</p>
+      </div>
+      <button class="scanner-close" onclick="closeTicketScanner()" aria-label="Close scanner">×</button>
+    </div>
+    <div class="scanner-body">
+      <section class="scanner-capture" aria-label="Ticket photo and connection">
+        <div class="scanner-section-title">1 · Ticket photo</div>
+        <div class="scanner-dropzone" id="ticketDropzone" onclick="document.getElementById('ticketFileInput').click()" ondragover="handleTicketDrag(event, true)" ondragleave="handleTicketDrag(event, false)" ondrop="handleTicketDrop(event)">
+          <img id="ticketPreview" alt="Selected handwritten order ticket preview">
+          <div class="scanner-drop-copy">
+            <div class="scanner-drop-icon">🧾</div>
+            <strong>Tap to choose a ticket photo</strong>
+            <span>Use a clear, well-lit image. The whole ticket should be visible.</span>
+          </div>
+        </div>
+        <input type="file" id="ticketFileInput" accept="image/*" hidden onchange="handleTicketFile(this.files[0])">
+        <input type="file" id="ticketCameraInput" accept="image/*" capture="environment" hidden onchange="handleTicketFile(this.files[0])">
+        <div class="scanner-file-actions">
+          <button class="scanner-button secondary" onclick="event.stopPropagation();document.getElementById('ticketCameraInput').click()">📷 Take Photo</button>
+          <button class="scanner-button neutral" id="ticketRemovePhotoBtn" onclick="clearTicketPhoto()" disabled>Remove Photo</button>
+        </div>
+
+        <div class="scanner-config">
+          <div class="scanner-section-title">2 · AI connection</div>
+          <div class="scanner-config-note"><strong>Standalone mode:</strong> your key is kept only in this page's memory and is never saved. Use the secure-server option for a shared or permanently installed system.</div>
+          <div class="scanner-field">
+            <label for="scannerConnectionMode">Connection</label>
+            <select id="scannerConnectionMode" onchange="updateScannerConnectionMode()">
+              <option value="direct">OpenAI API key · standalone</option>
+              <option value="proxy">Secure server endpoint</option>
+            </select>
+          </div>
+          <div id="scannerDirectFields">
+            <div class="scanner-field">
+              <label for="scannerApiKey">OpenAI API key</label>
+              <div class="scanner-key-wrap">
+                <input id="scannerApiKey" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false">
+                <button class="scanner-key-toggle" type="button" onclick="toggleScannerKeyVisibility()">Show</button>
+              </div>
+            </div>
+          </div>
+          <div id="scannerProxyFields" style="display:none">
+            <div class="scanner-field">
+              <label for="scannerProxyEndpoint">Server endpoint</label>
+              <input id="scannerProxyEndpoint" type="url" value="/api/read-ticket" placeholder="https://your-server.example/api/read-ticket" spellcheck="false">
+            </div>
+          </div>
+          <div class="scanner-field">
+            <label for="scannerModel">Vision model</label>
+            <input id="scannerModel" type="text" value="gpt-5.4-mini" spellcheck="false">
+          </div>
+        </div>
+        <button class="scanner-button primary scanner-analyze" id="analyzeTicketBtn" onclick="analyzeTicket()" disabled>Analyze Ticket</button>
+        <div class="scanner-status" id="scannerStatus" role="status" aria-live="polite"></div>
+        <div class="scanner-privacy">The app sends the selected image only when you press Analyze Ticket.</div>
+      </section>
+
+      <section class="scanner-review" id="scannerReview" aria-label="Transcription review">
+        <div class="scanner-empty-review" id="scannerEmptyReview">
+          <div class="icon">🔎</div>
+          <strong>Review appears here</strong>
+          <span>Uncertain or ambiguous lines will be highlighted and left unselected until a person confirms them.</span>
+        </div>
+        <div id="scannerResults" style="display:none"></div>
+      </section>
+    </div>
   </div>
 </div>
 
@@ -1288,6 +1461,727 @@ const menu = {
     { name: "Paper Plates", price: 0 },
   ],
 };
+
+// ─── HANDWRITTEN TICKET SCANNER ───
+// This feature is intentionally conservative: uncertain items are not selected
+// for import until a person resolves them in the review panel.
+const TICKET_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ticket_read: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        legible: { type: "boolean" },
+        day_part_hint: { type: "string", enum: ["lunch", "dinner", "unclear"] },
+        header_notes: { anyOf: [{ type: "string" }, { type: "null" }] }
+      },
+      required: ["legible", "day_part_hint", "header_notes"]
+    },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          raw_text: { type: "string" },
+          quantity: { type: "integer", minimum: 1 },
+          matched_item: { anyOf: [{ type: "string" }, { type: "null" }] },
+          category: { anyOf: [{ type: "string" }, { type: "null" }] },
+          price_each: { anyOf: [{ type: "number" }, { type: "null" }] },
+          modifiers: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              spice_level: { anyOf: [{ type: "string", enum: ["Mild", "Medium", "Spicy", "Ex Spicy"] }, { type: "null" }] },
+              rice: { anyOf: [{ type: "string", enum: ["Steamed Rice", "Pork Fried Rice"] }, { type: "null" }] },
+              notes: { anyOf: [{ type: "string" }, { type: "null" }] }
+            },
+            required: ["spice_level", "rice", "notes"]
+          },
+          ambiguous: { type: "boolean" },
+          ambiguous_candidates: { type: "array", items: { type: "string" } },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
+          needs_review: { type: "boolean" }
+        },
+        required: ["raw_text", "quantity", "matched_item", "category", "price_each", "modifiers", "ambiguous", "ambiguous_candidates", "confidence", "needs_review"]
+      }
+    },
+    subtotal_estimate: { type: "number" },
+    flags: { type: "array", items: { type: "string" } }
+  },
+  required: ["ticket_read", "items", "subtotal_estimate", "flags"]
+};
+
+function scannerCleanName(name) {
+  return String(name || "").replace(/🌶️?/g, "").replace(/\s+/g, " ").trim();
+}
+
+function scannerNormalizedName(name) {
+  return scannerCleanName(name).toLowerCase().replace(/\(spicy\)/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+const scannerMenuFlat = [];
+Object.keys(menu).forEach(function(category) {
+  menu[category].forEach(function(item) {
+    scannerMenuFlat.push({
+      category: category,
+      item: item,
+      cleanName: scannerCleanName(item.name)
+    });
+  });
+});
+
+let scannerImageDataUrl = null;
+let scannerImageName = "";
+let scannerResult = null;
+
+function openTicketScanner() {
+  haptic("light");
+  document.getElementById("ticketScannerOverlay").classList.add("show");
+  updateScannerConnectionMode();
+}
+
+function closeTicketScanner() {
+  document.getElementById("ticketScannerOverlay").classList.remove("show");
+}
+
+function updateScannerConnectionMode() {
+  const direct = document.getElementById("scannerConnectionMode").value === "direct";
+  document.getElementById("scannerDirectFields").style.display = direct ? "" : "none";
+  document.getElementById("scannerProxyFields").style.display = direct ? "none" : "";
+}
+
+function toggleScannerKeyVisibility() {
+  const input = document.getElementById("scannerApiKey");
+  const button = input.parentElement.querySelector(".scanner-key-toggle");
+  input.type = input.type === "password" ? "text" : "password";
+  button.textContent = input.type === "password" ? "Show" : "Hide";
+}
+
+function handleTicketDrag(event, active) {
+  event.preventDefault();
+  event.stopPropagation();
+  document.getElementById("ticketDropzone").classList.toggle("dragover", active);
+}
+
+function handleTicketDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  handleTicketDrag(event, false);
+  if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
+    handleTicketFile(event.dataTransfer.files[0]);
+  }
+}
+
+function readTicketFileAsDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function() { resolve(reader.result); };
+    reader.onerror = function() { reject(new Error("The selected image could not be read.")); };
+    reader.readAsDataURL(file);
+  });
+}
+
+function optimizeTicketImage(dataUrl) {
+  return new Promise(function(resolve, reject) {
+    const image = new Image();
+    image.onload = function() {
+      const maxSide = 2400;
+      const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
+    };
+    image.onerror = function() { reject(new Error("This image format is not supported by the browser. Try a JPG or PNG photo.")); };
+    image.src = dataUrl;
+  });
+}
+
+async function handleTicketFile(file) {
+  if (!file) return;
+  if (!file.type || file.type.indexOf("image/") !== 0) {
+    setScannerStatus("error", "Please choose an image file.");
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    setScannerStatus("error", "That photo is larger than 25 MB. Please choose a smaller image.");
+    return;
+  }
+  try {
+    setScannerStatus("working", "Preparing the ticket photo…");
+    const original = await readTicketFileAsDataUrl(file);
+    scannerImageDataUrl = await optimizeTicketImage(original);
+    scannerImageName = file.name || "ticket";
+    const preview = document.getElementById("ticketPreview");
+    preview.src = scannerImageDataUrl;
+    document.getElementById("ticketDropzone").classList.add("has-image");
+    document.getElementById("ticketRemovePhotoBtn").disabled = false;
+    document.getElementById("analyzeTicketBtn").disabled = false;
+    scannerResult = null;
+    document.getElementById("scannerResults").style.display = "none";
+    document.getElementById("scannerEmptyReview").style.display = "flex";
+    setScannerStatus("success", "Photo ready. Check the connection below, then analyze it.");
+  } catch (error) {
+    clearTicketPhoto();
+    setScannerStatus("error", error.message || "The photo could not be prepared.");
+  }
+}
+
+function clearTicketPhoto() {
+  scannerImageDataUrl = null;
+  scannerImageName = "";
+  scannerResult = null;
+  const preview = document.getElementById("ticketPreview");
+  preview.removeAttribute("src");
+  document.getElementById("ticketDropzone").classList.remove("has-image", "dragover");
+  document.getElementById("ticketFileInput").value = "";
+  document.getElementById("ticketCameraInput").value = "";
+  document.getElementById("ticketRemovePhotoBtn").disabled = true;
+  document.getElementById("analyzeTicketBtn").disabled = true;
+  document.getElementById("scannerResults").style.display = "none";
+  document.getElementById("scannerEmptyReview").style.display = "flex";
+  setScannerStatus("", "");
+}
+
+function setScannerStatus(type, message) {
+  const status = document.getElementById("scannerStatus");
+  status.className = "scanner-status";
+  if (!message) {
+    status.textContent = "";
+    return;
+  }
+  status.classList.add("show", type);
+  status.innerHTML = type === "working"
+    ? '<div class="scanner-working-line"><span class="scanner-spinner"></span><span>' + scannerEsc(message) + "</span></div>"
+    : scannerEsc(message);
+}
+
+function getScannerMenuReference() {
+  const lines = ["MENU REFERENCE (use the exact category, item name, and price):"];
+  Object.keys(menu).forEach(function(category) {
+    lines.push("### " + category);
+    menu[category].forEach(function(item) {
+      lines.push("- " + scannerCleanName(item.name) + " — $" + Number(item.price).toFixed(2));
+    });
+  });
+  return lines.join("\n");
+}
+
+function getTicketScannerInstructions() {
+  return [
+    "You transcribe handwritten restaurant order tickets for Four Season Restaurant.",
+    "Be conservative. Do not guess enthusiastically and never invent an item.",
+    "Read every visible order line and mark. Preserve the raw handwritten text as closely as possible, including codes such as L6, No.3, and Style B.",
+    "Quantity defaults to 1 when none is written. Capture spice level, rice choice, and other notes.",
+    "Match every legible line against the menu reference. A written code is the strongest signal and must be trusted over a fuzzy name match.",
+    "If a written name has multiple menu matches at different prices and there is no day-part or code signal, set ambiguous true, list every plausible candidate, and set needs_review true.",
+    "If a line is illegible or cannot be matched confidently, retain it with matched_item null, confidence low, and needs_review true.",
+    "Do not silently correct, merge, or drop any visible line or unexplained mark.",
+    "confidence must be high, medium, or low. needs_review must be true whenever confidence is not high or ambiguous is true.",
+    "subtotal_estimate is the sum of matched base menu prices multiplied by quantity; unmatched items contribute zero.",
+    getScannerMenuReference()
+  ].join("\n\n");
+}
+
+function getTicketRequestPayload(model) {
+  return {
+    model: model,
+    store: false,
+    input: [
+      {
+        role: "system",
+        content: [
+          { type: "input_text", text: getTicketScannerInstructions() }
+        ]
+      },
+      {
+        role: "user",
+        content: [
+          { type: "input_text", text: "Transcribe this handwritten order ticket. Return the structured ticket result only." },
+          { type: "input_image", image_url: scannerImageDataUrl, detail: "high" }
+        ]
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "four_season_ticket",
+        strict: true,
+        schema: TICKET_RESPONSE_SCHEMA
+      }
+    }
+  };
+}
+
+function extractScannerResponseText(response) {
+  if (response && typeof response.output_text === "string") return response.output_text;
+  if (!response || !Array.isArray(response.output)) return null;
+  for (let i = 0; i < response.output.length; i++) {
+    const output = response.output[i];
+    if (!output || !Array.isArray(output.content)) continue;
+    for (let j = 0; j < output.content.length; j++) {
+      const content = output.content[j];
+      if (content && content.type === "output_text" && typeof content.text === "string") return content.text;
+    }
+  }
+  return null;
+}
+
+async function analyzeTicket() {
+  if (!scannerImageDataUrl) {
+    setScannerStatus("error", "Choose or photograph a ticket first.");
+    return;
+  }
+
+  const mode = document.getElementById("scannerConnectionMode").value;
+  const model = document.getElementById("scannerModel").value.trim() || "gpt-5.4-mini";
+  const button = document.getElementById("analyzeTicketBtn");
+  button.disabled = true;
+  button.textContent = "Reading Ticket…";
+  setScannerStatus("working", "Reading every line and checking it against the menu. This can take a moment.");
+
+  try {
+    let result;
+    if (mode === "direct") {
+      const apiKey = document.getElementById("scannerApiKey").value.trim();
+      if (!apiKey) throw new Error("Enter an OpenAI API key. It is used for this session only and is not saved.");
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + apiKey
+        },
+        body: JSON.stringify(getTicketRequestPayload(model))
+      });
+      const responseJson = await response.json().catch(function() { return {}; });
+      if (!response.ok) {
+        const apiMessage = responseJson && responseJson.error && responseJson.error.message;
+        throw new Error(apiMessage || "OpenAI returned an error (" + response.status + ").");
+      }
+      const responseText = extractScannerResponseText(responseJson);
+      if (!responseText) throw new Error("The AI response did not contain a ticket result.");
+      result = JSON.parse(responseText);
+    } else {
+      const endpoint = document.getElementById("scannerProxyEndpoint").value.trim();
+      if (!endpoint) throw new Error("Enter the secure server endpoint.");
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_data_url: scannerImageDataUrl,
+          model: model,
+          instructions: getTicketScannerInstructions(),
+          schema: TICKET_RESPONSE_SCHEMA
+        })
+      });
+      const responseJson = await response.json().catch(function() { return {}; });
+      if (!response.ok) {
+        const proxyMessage = responseJson && (responseJson.error || responseJson.message);
+        throw new Error(typeof proxyMessage === "string" ? proxyMessage : "The ticket server returned an error (" + response.status + ").");
+      }
+      if (responseJson.ticket_read) {
+        result = responseJson;
+      } else {
+        const responseText = extractScannerResponseText(responseJson);
+        if (!responseText) throw new Error("The ticket server did not return a ticket result.");
+        result = JSON.parse(responseText);
+      }
+    }
+
+    scannerResult = normalizeScannerResult(result);
+    renderScannerResults();
+    const reviewCount = scannerResult.items.filter(function(item) { return item.needs_review; }).length;
+    setScannerStatus(
+      "success",
+      "Ticket read: " + scannerResult.items.length + " line" + (scannerResult.items.length === 1 ? "" : "s") +
+      (reviewCount ? ". " + reviewCount + " need" + (reviewCount === 1 ? "s" : "") + " human review." : ". All lines have high-confidence matches.")
+    );
+    haptic("success");
+  } catch (error) {
+    console.error("Ticket scan failed", error);
+    let message = error && error.message ? error.message : "The ticket could not be analyzed.";
+    if (/failed to fetch/i.test(message)) {
+      message = "The API connection was blocked or unavailable. Check the internet connection, or use the secure-server option.";
+    }
+    if (/JSON/i.test(message) && /position|token|parse/i.test(message)) {
+      message = "The AI returned an unreadable result. Please try the photo again.";
+    }
+    setScannerStatus("error", message);
+    haptic("error");
+  } finally {
+    button.disabled = !scannerImageDataUrl;
+    button.textContent = "Analyze Ticket";
+  }
+}
+
+function normalizeScannerResult(result) {
+  const safe = result && typeof result === "object" ? result : {};
+  const ticketRead = safe.ticket_read && typeof safe.ticket_read === "object" ? safe.ticket_read : {};
+  const normalized = {
+    ticket_read: {
+      legible: Boolean(ticketRead.legible),
+      day_part_hint: ["lunch", "dinner", "unclear"].includes(ticketRead.day_part_hint) ? ticketRead.day_part_hint : "unclear",
+      header_notes: ticketRead.header_notes == null ? null : String(ticketRead.header_notes)
+    },
+    items: Array.isArray(safe.items) ? safe.items.map(function(item) {
+      const modifiers = item && item.modifiers && typeof item.modifiers === "object" ? item.modifiers : {};
+      const confidence = ["high", "medium", "low"].includes(item && item.confidence) ? item.confidence : "low";
+      const ambiguous = Boolean(item && item.ambiguous);
+      const normalizedItem = {
+        raw_text: item && item.raw_text != null ? String(item.raw_text) : "[illegible]",
+        quantity: Math.max(1, parseInt(item && item.quantity, 10) || 1),
+        matched_item: item && item.matched_item != null ? String(item.matched_item) : null,
+        category: item && item.category != null ? String(item.category) : null,
+        price_each: item && Number.isFinite(Number(item.price_each)) ? Number(item.price_each) : null,
+        modifiers: {
+          spice_level: ["Mild", "Medium", "Spicy", "Ex Spicy"].includes(modifiers.spice_level) ? modifiers.spice_level : null,
+          rice: ["Steamed Rice", "Pork Fried Rice"].includes(modifiers.rice) ? modifiers.rice : null,
+          notes: modifiers.notes == null ? null : String(modifiers.notes)
+        },
+        ambiguous: ambiguous,
+        ambiguous_candidates: Array.isArray(item && item.ambiguous_candidates) ? item.ambiguous_candidates.map(String) : [],
+        confidence: confidence,
+        needs_review: Boolean(item && item.needs_review) || ambiguous || confidence !== "high",
+        _menuIndex: -1,
+        _selected: false
+      };
+      normalizedItem._menuIndex = normalizedItem.ambiguous ? -1 : resolveScannerMenuIndex(normalizedItem);
+      normalizedItem._selected = normalizedItem._menuIndex >= 0 && !normalizedItem.needs_review;
+      if (normalizedItem._menuIndex < 0 && normalizedItem.matched_item) normalizedItem.needs_review = true;
+      return normalizedItem;
+    }) : [],
+    subtotal_estimate: Number.isFinite(Number(safe.subtotal_estimate)) ? Number(safe.subtotal_estimate) : 0,
+    flags: Array.isArray(safe.flags) ? safe.flags.map(String) : []
+  };
+  recalculateScannerSubtotal(normalized);
+  return normalized;
+}
+
+function resolveScannerMenuIndex(item) {
+  const targetName = scannerNormalizedName(item.matched_item);
+  const targetCategory = String(item.category || "").toLowerCase();
+  const targetPrice = Number(item.price_each);
+  let candidates = scannerMenuFlat.map(function(entry, index) { return { entry: entry, index: index }; });
+  if (targetCategory) {
+    const inCategory = candidates.filter(function(candidate) {
+      return candidate.entry.category.toLowerCase() === targetCategory;
+    });
+    if (inCategory.length) candidates = inCategory;
+  }
+  if (targetName) {
+    const exact = candidates.find(function(candidate) {
+      return scannerNormalizedName(candidate.entry.cleanName) === targetName;
+    });
+    if (exact) return exact.index;
+    const contains = candidates.find(function(candidate) {
+      const name = scannerNormalizedName(candidate.entry.cleanName);
+      return name.indexOf(targetName) >= 0 || targetName.indexOf(name) >= 0;
+    });
+    if (contains) return contains.index;
+  }
+  if (Number.isFinite(targetPrice)) {
+    const samePrice = candidates.filter(function(candidate) {
+      return Math.abs(Number(candidate.entry.item.price) - targetPrice) < 0.001;
+    });
+    if (samePrice.length === 1) return samePrice[0].index;
+  }
+  return -1;
+}
+
+function scannerEsc(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function scannerMenuOptions(selectedIndex) {
+  let options = '<option value="">— Needs menu match —</option>';
+  scannerMenuFlat.forEach(function(entry, index) {
+    options += '<option value="' + index + '"' + (index === selectedIndex ? " selected" : "") + ">" +
+      scannerEsc(entry.category + " · " + entry.cleanName + " · $" + Number(entry.item.price).toFixed(2)) +
+      "</option>";
+  });
+  return options;
+}
+
+function renderScannerResults() {
+  if (!scannerResult) return;
+  const container = document.getElementById("scannerResults");
+  let flagsHtml = "";
+  if (scannerResult.flags.length) {
+    flagsHtml = '<div class="scanner-summary-flags"><span class="scanner-mini-label">General warnings</span>' +
+      scannerResult.flags.map(function(flag) {
+        return '<div class="scanner-flag"><span>⚠</span><span>' + scannerEsc(flag) + "</span></div>";
+      }).join("") + "</div>";
+  }
+
+  let itemsHtml = "";
+  if (!scannerResult.items.length) {
+    itemsHtml = '<div class="scanner-empty-review" style="min-height:260px"><div class="icon">📝</div><strong>No order lines found</strong><span>Try a clearer photo. Nothing will be added to the order.</span></div>';
+  } else {
+    itemsHtml = '<div class="scanner-item-list">' + scannerResult.items.map(function(item, index) {
+      const cardClass = item.confidence === "low" ? " low-confidence" : (item.needs_review ? " needs-review" : "");
+      const candidates = item.ambiguous_candidates.length
+        ? '<div class="scanner-candidates"><strong>Possible matches:</strong> ' + scannerEsc(item.ambiguous_candidates.join(" · ")) + "</div>"
+        : "";
+      return '<article class="scanner-item-card' + cardClass + '">' +
+        '<div class="scanner-item-top">' +
+          '<input class="scanner-import-check" type="checkbox" data-scanner-select="' + index + '"' + (item._selected ? " checked" : "") + (item._menuIndex < 0 ? " disabled" : "") + ' aria-label="Include line ' + (index + 1) + ' in order">' +
+          "<div><div class=\"scanner-item-number\">Ticket line " + (index + 1) + "</div><div class=\"scanner-raw-line\">" + scannerEsc(item.raw_text) + "</div></div>" +
+          '<span class="scanner-badge ' + scannerEsc(item.confidence) + '">' + scannerEsc(item.confidence) + "</span>" +
+        "</div>" +
+        '<div class="scanner-item-grid">' +
+          '<div><label class="scanner-mini-label">Quantity</label><input type="number" min="1" max="99" value="' + item.quantity + '" data-scanner-field="quantity" data-index="' + index + '"></div>' +
+          '<div class="wide"><label class="scanner-mini-label">Confirmed menu item</label><select data-scanner-field="match" data-index="' + index + '">' + scannerMenuOptions(item._menuIndex) + "</select></div>" +
+          '<div><label class="scanner-mini-label">Confidence</label><select data-scanner-field="confidence" data-index="' + index + '">' +
+            '<option value="high"' + (item.confidence === "high" ? " selected" : "") + ">High</option>" +
+            '<option value="medium"' + (item.confidence === "medium" ? " selected" : "") + ">Medium</option>" +
+            '<option value="low"' + (item.confidence === "low" ? " selected" : "") + ">Low</option>" +
+          "</select></div>" +
+          '<div style="grid-column:1/-1"><label class="scanner-mini-label">Raw handwriting</label><input type="text" value="' + scannerEsc(item.raw_text) + '" data-scanner-field="raw_text" data-index="' + index + '"></div>' +
+          '<div><label class="scanner-mini-label">Spice</label><select data-scanner-field="spice_level" data-index="' + index + '">' +
+            '<option value="">None written</option>' +
+            ["Mild", "Medium", "Spicy", "Ex Spicy"].map(function(level) {
+              return '<option value="' + level + '"' + (item.modifiers.spice_level === level ? " selected" : "") + ">" + level + "</option>";
+            }).join("") +
+          "</select></div>" +
+          '<div><label class="scanner-mini-label">Rice</label><select data-scanner-field="rice" data-index="' + index + '">' +
+            '<option value="">None written</option>' +
+            '<option value="Steamed Rice"' + (item.modifiers.rice === "Steamed Rice" ? " selected" : "") + ">Steamed Rice</option>" +
+            '<option value="Pork Fried Rice"' + (item.modifiers.rice === "Pork Fried Rice" ? " selected" : "") + ">Pork Fried Rice</option>" +
+          "</select></div>" +
+          '<div class="wide"><label class="scanner-mini-label">Other notes</label><input type="text" value="' + scannerEsc(item.modifiers.notes || "") + '" placeholder="no onion, extra sauce…" data-scanner-field="notes" data-index="' + index + '"></div>' +
+        "</div>" + candidates + "</article>";
+    }).join("") + "</div>";
+  }
+
+  container.innerHTML =
+    '<div class="scanner-section-title">3 · Human review</div>' +
+    '<div class="scanner-review-summary">' +
+      '<div class="scanner-summary-grid">' +
+        '<div><label class="scanner-mini-label">Day part</label><select id="scannerDayPart">' +
+          '<option value="unclear"' + (scannerResult.ticket_read.day_part_hint === "unclear" ? " selected" : "") + ">Unclear</option>" +
+          '<option value="lunch"' + (scannerResult.ticket_read.day_part_hint === "lunch" ? " selected" : "") + ">Lunch</option>" +
+          '<option value="dinner"' + (scannerResult.ticket_read.day_part_hint === "dinner" ? " selected" : "") + ">Dinner</option>" +
+        "</select></div>" +
+        '<div><label class="scanner-mini-label">Header notes</label><input id="scannerHeaderNotes" type="text" value="' + scannerEsc(scannerResult.ticket_read.header_notes || "") + '" placeholder="table, name, time…"></div>' +
+      "</div>" + flagsHtml +
+    "</div>" +
+    itemsHtml +
+    '<div class="scanner-results-actions">' +
+      '<button class="scanner-button secondary" id="scannerCopyBtn">Copy JSON</button>' +
+      '<button class="scanner-button neutral" id="scannerDownloadBtn">Download JSON</button>' +
+      '<button class="scanner-button primary" id="scannerImportBtn">Add Selected to Order</button>' +
+    "</div>";
+
+  document.getElementById("scannerEmptyReview").style.display = "none";
+  container.style.display = "block";
+
+  document.getElementById("scannerDayPart").addEventListener("change", function() {
+    scannerResult.ticket_read.day_part_hint = this.value;
+  });
+  document.getElementById("scannerHeaderNotes").addEventListener("change", function() {
+    scannerResult.ticket_read.header_notes = this.value.trim() || null;
+  });
+  container.querySelectorAll("[data-scanner-select]").forEach(function(input) {
+    input.addEventListener("change", function() {
+      scannerResult.items[Number(this.dataset.scannerSelect)]._selected = this.checked;
+    });
+  });
+  container.querySelectorAll("[data-scanner-field]").forEach(function(input) {
+    input.addEventListener("change", function() {
+      updateScannerItem(Number(this.dataset.index), this.dataset.scannerField, this.value);
+    });
+  });
+  document.getElementById("scannerCopyBtn").addEventListener("click", copyScannerJson);
+  document.getElementById("scannerDownloadBtn").addEventListener("click", downloadScannerJson);
+  document.getElementById("scannerImportBtn").addEventListener("click", addScannedItemsToOrder);
+}
+
+function updateScannerItem(index, field, value) {
+  const item = scannerResult && scannerResult.items[index];
+  if (!item) return;
+  if (field === "quantity") {
+    item.quantity = Math.max(1, parseInt(value, 10) || 1);
+  } else if (field === "raw_text") {
+    item.raw_text = String(value || "[illegible]");
+  } else if (field === "confidence") {
+    item.confidence = ["high", "medium", "low"].includes(value) ? value : "low";
+    item.needs_review = item.ambiguous || item.confidence !== "high" || item._menuIndex < 0;
+    if (item.needs_review) item._selected = false;
+  } else if (field === "spice_level") {
+    item.modifiers.spice_level = value || null;
+  } else if (field === "rice") {
+    item.modifiers.rice = value || null;
+  } else if (field === "notes") {
+    item.modifiers.notes = String(value || "").trim() || null;
+  } else if (field === "match") {
+    const menuIndex = value === "" ? -1 : Number(value);
+    item._menuIndex = Number.isInteger(menuIndex) ? menuIndex : -1;
+    if (item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex]) {
+      const entry = scannerMenuFlat[item._menuIndex];
+      item.matched_item = entry.cleanName;
+      item.category = entry.category;
+      item.price_each = Number(entry.item.price);
+      item.ambiguous = false;
+      item.ambiguous_candidates = [];
+      item.confidence = "high";
+      item.needs_review = false;
+      item._selected = true;
+    } else {
+      item.matched_item = null;
+      item.category = null;
+      item.price_each = null;
+      item.confidence = "low";
+      item.needs_review = true;
+      item._selected = false;
+    }
+  }
+  recalculateScannerSubtotal(scannerResult);
+  renderScannerResults();
+}
+
+function recalculateScannerSubtotal(result) {
+  result.subtotal_estimate = Number(result.items.reduce(function(sum, item) {
+    const price = Number(item.price_each);
+    return sum + (Number.isFinite(price) ? price * Math.max(1, Number(item.quantity) || 1) : 0);
+  }, 0).toFixed(2));
+}
+
+function getCleanScannerResult() {
+  if (!scannerResult) return null;
+  recalculateScannerSubtotal(scannerResult);
+  return {
+    ticket_read: {
+      legible: Boolean(scannerResult.ticket_read.legible),
+      day_part_hint: scannerResult.ticket_read.day_part_hint,
+      header_notes: scannerResult.ticket_read.header_notes
+    },
+    items: scannerResult.items.map(function(item) {
+      return {
+        raw_text: item.raw_text,
+        quantity: item.quantity,
+        matched_item: item.matched_item,
+        category: item.category,
+        price_each: item.price_each,
+        modifiers: {
+          spice_level: item.modifiers.spice_level,
+          rice: item.modifiers.rice,
+          notes: item.modifiers.notes
+        },
+        ambiguous: item.ambiguous,
+        ambiguous_candidates: item.ambiguous_candidates.slice(),
+        confidence: item.confidence,
+        needs_review: item.needs_review
+      };
+    }),
+    subtotal_estimate: scannerResult.subtotal_estimate,
+    flags: scannerResult.flags.slice()
+  };
+}
+
+async function copyScannerJson() {
+  const json = JSON.stringify(getCleanScannerResult(), null, 2);
+  try {
+    await navigator.clipboard.writeText(json);
+  } catch (error) {
+    const textarea = document.createElement("textarea");
+    textarea.value = json;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  }
+  setScannerStatus("success", "Ticket JSON copied to the clipboard.");
+}
+
+function downloadScannerJson() {
+  const json = JSON.stringify(getCleanScannerResult(), null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  const baseName = (scannerImageName || "ticket").replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "-");
+  link.download = baseName + "-transcription.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
+}
+
+function addScannedItemsToOrder() {
+  if (!scannerResult) return;
+  const selected = scannerResult.items.filter(function(item) {
+    return item._selected && item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex];
+  });
+  if (!selected.length) {
+    setScannerStatus("error", "Select at least one confirmed menu item before importing.");
+    return;
+  }
+
+  let addedQuantity = 0;
+  selected.forEach(function(scanItem) {
+    const source = scannerMenuFlat[scanItem._menuIndex];
+    const spice = scanItem.modifiers.spice_level;
+    const rice = scanItem.modifiers.rice;
+    const extraSpicyCharge = spice === "Ex Spicy" ? 1 : 0;
+    const riceUpcharge = rice === "Pork Fried Rice" && RICE_CATEGORIES.includes(source.category) ? RICE_UPGRADE_PRICE : 0;
+    const note = scanItem.modifiers.notes || "";
+    const imported = Object.assign({}, source.item, {
+      qty: scanItem.quantity,
+      category: source.category,
+      price: Number(source.item.price) + extraSpicyCharge + riceUpcharge,
+      basePrice: Number(source.item.price),
+      note: note,
+      scannedRawText: scanItem.raw_text
+    });
+    if (spice) {
+      imported.spiceLevel = spice;
+      imported.extraSpicyCharge = extraSpicyCharge;
+    }
+    if (rice) {
+      imported.riceChoice = rice;
+      imported.riceUpcharge = riceUpcharge;
+    }
+    if (orderType === "Dine In") {
+      imported.course = source.category === "Appetizers" || source.category === "Dim Sum" || source.category === "Soup" ? "Appetizer" : "Entrée";
+    }
+    const existing = order.find(function(orderItem) {
+      return orderItem.name === imported.name &&
+        (orderItem.spiceLevel || null) === (imported.spiceLevel || null) &&
+        (orderItem.riceChoice || null) === (imported.riceChoice || null) &&
+        (orderItem.note || "") === (imported.note || "") &&
+        !orderItem.fired;
+    });
+    if (existing) existing.qty += imported.qty;
+    else order.push(imported);
+    addedQuantity += imported.qty;
+  });
+
+  renderOrder();
+  closeTicketScanner();
+  showInfoToast(addedQuantity + " scanned item" + (addedQuantity === 1 ? "" : "s") + " added to the active order");
+  haptic("success");
+}
+
+document.addEventListener("keydown", function(event) {
+  if (event.key === "Escape" && document.getElementById("ticketScannerOverlay").classList.contains("show")) {
+    closeTicketScanner();
+  }
+});
 
 // Substitution options for combo customization
 const SUBSTITUTION_OPTIONS = [

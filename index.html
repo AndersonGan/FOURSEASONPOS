@@ -638,6 +638,16 @@
   .scanner-config { margin-top: 18px; padding: 15px; border: 1px solid #e3ddd3; border-radius: 12px; background: #fbfaf7; }
   .scanner-config-note { font-size: 12px; line-height: 1.45; color: #777; margin-bottom: 12px; }
   .scanner-config-note strong { color: #555; }
+  .scanner-engine-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 12px 0; }
+  .scanner-engine-chip { padding: 9px 7px; border-radius: 9px; background: #edf8f5; border: 1px solid #c2e1da; text-align: center; color: #17695a; }
+  .scanner-engine-chip strong { display: block; font-size: 12px; margin-bottom: 2px; }
+  .scanner-engine-chip span { display: block; font-size: 10px; line-height: 1.3; color: #63827b; }
+  .scanner-model-state { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; background: #f2f0eb; color: #6c665e; font-size: 11px; line-height: 1.35; }
+  .scanner-model-dot { width: 9px; height: 9px; border-radius: 50%; background: #aaa39a; flex: 0 0 auto; }
+  .scanner-model-state.ready .scanner-model-dot { background: #28a56f; box-shadow: 0 0 0 3px rgba(40,165,111,0.14); }
+  .scanner-model-state.loading .scanner-model-dot { background: #e59d31; box-shadow: 0 0 0 3px rgba(229,157,49,0.14); animation: scannerPulse 1.1s ease-in-out infinite; }
+  .scanner-model-state.error .scanner-model-dot { background: #c94a3e; }
+  @keyframes scannerPulse { 50% { opacity: 0.35; } }
   .scanner-field { margin-bottom: 10px; }
   .scanner-field:last-child { margin-bottom: 0; }
   .scanner-field label { display: block; font-size: 11px; font-weight: 800; color: #68635b; text-transform: uppercase; letter-spacing: 0.45px; margin-bottom: 5px; }
@@ -690,6 +700,9 @@
   body.dark .scanner-drop-copy strong { color: #65d3bd; }
   body.dark .scanner-drop-copy { color: #a2bbb6; }
   body.dark .scanner-config { background: #1d1d1d; border-color: #383838; }
+  body.dark .scanner-engine-chip { background: #17312b; border-color: #295249; color: #6bd6c0; }
+  body.dark .scanner-engine-chip span { color: #94aaa5; }
+  body.dark .scanner-model-state { background: #292929; color: #aaa; }
   body.dark .scanner-field input, body.dark .scanner-field select, body.dark .scanner-item-card input, body.dark .scanner-item-card select, body.dark .scanner-review-summary input, body.dark .scanner-review-summary select { background: #2a2a2a; color: #eee; border-color: #444; }
   body.dark .scanner-item-card.needs-review { background: #27231c; }
   body.dark .scanner-results-actions { background: linear-gradient(to bottom, rgba(23,23,23,0), #171717 20%); }
@@ -701,6 +714,7 @@
     .scanner-item-grid { grid-template-columns: 80px 1fr; }
     .scanner-item-grid .wide { grid-column: 1 / -1; }
     .scanner-summary-grid { grid-template-columns: 1fr; }
+    .scanner-engine-grid { grid-template-columns: 1fr; }
     .scanner-results-actions { bottom: 0; grid-template-columns: 1fr 1fr; }
     .scanner-results-actions .primary { grid-column: 1 / -1; grid-row: 1; }
   }
@@ -1008,7 +1022,7 @@
     <div class="scanner-header">
       <div class="scanner-header-copy">
         <h3 id="ticketScannerTitle">Handwritten Ticket Scanner</h3>
-        <p>Photograph, review, and confirm every line before adding it to the order.</p>
+        <p>Free on-device recognition · no API key · photos stay on this device.</p>
       </div>
       <button class="scanner-close" onclick="closeTicketScanner()" aria-label="Close scanner">×</button>
     </div>
@@ -1031,38 +1045,21 @@
         </div>
 
         <div class="scanner-config">
-          <div class="scanner-section-title">2 · AI connection</div>
-          <div class="scanner-config-note"><strong>Standalone mode:</strong> your key is kept only in this page's memory and is never saved. Use the secure-server option for a shared or permanently installed system.</div>
-          <div class="scanner-field">
-            <label for="scannerConnectionMode">Connection</label>
-            <select id="scannerConnectionMode" onchange="updateScannerConnectionMode()">
-              <option value="direct">OpenAI API key · standalone</option>
-              <option value="proxy">Secure server endpoint</option>
-            </select>
+          <div class="scanner-section-title">2 · Local handwriting engine</div>
+          <div class="scanner-config-note"><strong>No subscription or API account:</strong> a small handwriting reader runs inside this browser. The first scan downloads its recognition files; the browser caches them for later visits.</div>
+          <div class="scanner-engine-grid">
+            <div class="scanner-engine-chip"><strong>Free</strong><span>No per-scan fee</span></div>
+            <div class="scanner-engine-chip"><strong>Private</strong><span>Photo stays local</span></div>
+            <div class="scanner-engine-chip"><strong>Review-first</strong><span>Uncertain lines held</span></div>
           </div>
-          <div id="scannerDirectFields">
-            <div class="scanner-field">
-              <label for="scannerApiKey">OpenAI API key</label>
-              <div class="scanner-key-wrap">
-                <input id="scannerApiKey" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false">
-                <button class="scanner-key-toggle" type="button" onclick="toggleScannerKeyVisibility()">Show</button>
-              </div>
-            </div>
-          </div>
-          <div id="scannerProxyFields" style="display:none">
-            <div class="scanner-field">
-              <label for="scannerProxyEndpoint">Server endpoint</label>
-              <input id="scannerProxyEndpoint" type="url" value="/api/read-ticket" placeholder="https://your-server.example/api/read-ticket" spellcheck="false">
-            </div>
-          </div>
-          <div class="scanner-field">
-            <label for="scannerModel">Vision model</label>
-            <input id="scannerModel" type="text" value="gpt-5.4-mini" spellcheck="false">
+          <div class="scanner-model-state" id="scannerModelState">
+            <span class="scanner-model-dot"></span>
+            <span id="scannerModelStateText">Recognition model loads when the first ticket is analyzed.</span>
           </div>
         </div>
-        <button class="scanner-button primary scanner-analyze" id="analyzeTicketBtn" onclick="analyzeTicket()" disabled>Analyze Ticket</button>
+        <button class="scanner-button primary scanner-analyze" id="analyzeTicketBtn" onclick="analyzeTicket()" disabled>Read Ticket Locally</button>
         <div class="scanner-status" id="scannerStatus" role="status" aria-live="polite"></div>
-        <div class="scanner-privacy">The app sends the selected image only when you press Analyze Ticket.</div>
+        <div class="scanner-privacy">First use requires internet to download the free OCR model. Ticket photos are never uploaded.</div>
       </section>
 
       <section class="scanner-review" id="scannerReview" aria-label="Transcription review">
@@ -1465,55 +1462,6 @@ const menu = {
 // ─── HANDWRITTEN TICKET SCANNER ───
 // This feature is intentionally conservative: uncertain items are not selected
 // for import until a person resolves them in the review panel.
-const TICKET_RESPONSE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    ticket_read: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        legible: { type: "boolean" },
-        day_part_hint: { type: "string", enum: ["lunch", "dinner", "unclear"] },
-        header_notes: { anyOf: [{ type: "string" }, { type: "null" }] }
-      },
-      required: ["legible", "day_part_hint", "header_notes"]
-    },
-    items: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          raw_text: { type: "string" },
-          quantity: { type: "integer", minimum: 1 },
-          matched_item: { anyOf: [{ type: "string" }, { type: "null" }] },
-          category: { anyOf: [{ type: "string" }, { type: "null" }] },
-          price_each: { anyOf: [{ type: "number" }, { type: "null" }] },
-          modifiers: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              spice_level: { anyOf: [{ type: "string", enum: ["Mild", "Medium", "Spicy", "Ex Spicy"] }, { type: "null" }] },
-              rice: { anyOf: [{ type: "string", enum: ["Steamed Rice", "Pork Fried Rice"] }, { type: "null" }] },
-              notes: { anyOf: [{ type: "string" }, { type: "null" }] }
-            },
-            required: ["spice_level", "rice", "notes"]
-          },
-          ambiguous: { type: "boolean" },
-          ambiguous_candidates: { type: "array", items: { type: "string" } },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          needs_review: { type: "boolean" }
-        },
-        required: ["raw_text", "quantity", "matched_item", "category", "price_each", "modifiers", "ambiguous", "ambiguous_candidates", "confidence", "needs_review"]
-      }
-    },
-    subtotal_estimate: { type: "number" },
-    flags: { type: "array", items: { type: "string" } }
-  },
-  required: ["ticket_read", "items", "subtotal_estimate", "flags"]
-};
-
 function scannerCleanName(name) {
   return String(name || "").replace(/🌶️?/g, "").replace(/\s+/g, " ").trim();
 }
@@ -1536,28 +1484,16 @@ Object.keys(menu).forEach(function(category) {
 let scannerImageDataUrl = null;
 let scannerImageName = "";
 let scannerResult = null;
+let scannerOcrPipeline = null;
+let scannerOcrLoadingPromise = null;
 
 function openTicketScanner() {
   haptic("light");
   document.getElementById("ticketScannerOverlay").classList.add("show");
-  updateScannerConnectionMode();
 }
 
 function closeTicketScanner() {
   document.getElementById("ticketScannerOverlay").classList.remove("show");
-}
-
-function updateScannerConnectionMode() {
-  const direct = document.getElementById("scannerConnectionMode").value === "direct";
-  document.getElementById("scannerDirectFields").style.display = direct ? "" : "none";
-  document.getElementById("scannerProxyFields").style.display = direct ? "none" : "";
-}
-
-function toggleScannerKeyVisibility() {
-  const input = document.getElementById("scannerApiKey");
-  const button = input.parentElement.querySelector(".scanner-key-toggle");
-  input.type = input.type === "password" ? "text" : "password";
-  button.textContent = input.type === "password" ? "Show" : "Hide";
 }
 
 function handleTicketDrag(event, active) {
@@ -1665,75 +1601,477 @@ function setScannerStatus(type, message) {
     : scannerEsc(message);
 }
 
-function getScannerMenuReference() {
-  const lines = ["MENU REFERENCE (use the exact category, item name, and price):"];
-  Object.keys(menu).forEach(function(category) {
-    lines.push("### " + category);
-    menu[category].forEach(function(item) {
-      lines.push("- " + scannerCleanName(item.name) + " — $" + Number(item.price).toFixed(2));
-    });
-  });
-  return lines.join("\n");
+function setScannerModelState(state, text) {
+  const box = document.getElementById("scannerModelState");
+  const label = document.getElementById("scannerModelStateText");
+  if (!box || !label) return;
+  box.className = "scanner-model-state" + (state ? " " + state : "");
+  label.textContent = text;
 }
 
-function getTicketScannerInstructions() {
-  return [
-    "You transcribe handwritten restaurant order tickets for Four Season Restaurant.",
-    "Be conservative. Do not guess enthusiastically and never invent an item.",
-    "Read every visible order line and mark. Preserve the raw handwritten text as closely as possible, including codes such as L6, No.3, and Style B.",
-    "Quantity defaults to 1 when none is written. Capture spice level, rice choice, and other notes.",
-    "Match every legible line against the menu reference. A written code is the strongest signal and must be trusted over a fuzzy name match.",
-    "If a written name has multiple menu matches at different prices and there is no day-part or code signal, set ambiguous true, list every plausible candidate, and set needs_review true.",
-    "If a line is illegible or cannot be matched confidently, retain it with matched_item null, confidence low, and needs_review true.",
-    "Do not silently correct, merge, or drop any visible line or unexplained mark.",
-    "confidence must be high, medium, or low. needs_review must be true whenever confidence is not high or ambiguous is true.",
-    "subtotal_estimate is the sum of matched base menu prices multiplied by quantity; unmatched items contribute zero.",
-    getScannerMenuReference()
-  ].join("\n\n");
+function scannerModelProgress(info) {
+  if (!info || typeof info !== "object") return;
+  if (info.status === "progress") {
+    let value = Number(info.progress);
+    if (Number.isFinite(value)) {
+      if (value <= 1) value *= 100;
+      const file = info.file ? String(info.file).split("/").pop() : "recognition file";
+      setScannerModelState("loading", "Downloading " + file + " · " + Math.max(0, Math.min(100, Math.round(value))) + "%");
+    }
+  } else if (info.status === "initiate") {
+    setScannerModelState("loading", "Preparing local recognition files…");
+  }
 }
 
-function getTicketRequestPayload(model) {
-  return {
-    model: model,
-    store: false,
-    input: [
+async function loadScannerOcrPipeline() {
+  if (scannerOcrPipeline) return scannerOcrPipeline;
+  if (scannerOcrLoadingPromise) return scannerOcrLoadingPromise;
+  scannerOcrLoadingPromise = (async function() {
+    setScannerModelState("loading", "Loading the free handwriting model for the first time…");
+    const transformers = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0");
+    if (transformers.env) {
+      transformers.env.allowLocalModels = false;
+      transformers.env.useBrowserCache = true;
+    }
+    scannerOcrPipeline = await transformers.pipeline(
+      "image-to-text",
+      "Xenova/trocr-small-handwritten",
       {
-        role: "system",
-        content: [
-          { type: "input_text", text: getTicketScannerInstructions() }
-        ]
-      },
-      {
-        role: "user",
-        content: [
-          { type: "input_text", text: "Transcribe this handwritten order ticket. Return the structured ticket result only." },
-          { type: "input_image", image_url: scannerImageDataUrl, detail: "high" }
-        ]
+        dtype: "q8",
+        device: "wasm",
+        progress_callback: scannerModelProgress
       }
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "four_season_ticket",
-        strict: true,
-        schema: TICKET_RESPONSE_SCHEMA
+    );
+    setScannerModelState("ready", "Ready on this device · downloaded files will be reused from browser cache.");
+    return scannerOcrPipeline;
+  })().catch(function(error) {
+    scannerOcrLoadingPromise = null;
+    setScannerModelState("error", "Model could not load. Check the internet connection and try again.");
+    throw error;
+  });
+  return scannerOcrLoadingPromise;
+}
+
+function loadScannerImage(dataUrl) {
+  return new Promise(function(resolve, reject) {
+    const image = new Image();
+    image.onload = function() { resolve(image); };
+    image.onerror = function() { reject(new Error("The ticket image could not be opened.")); };
+    image.src = dataUrl;
+  });
+}
+
+function scannerOtsuThreshold(histogram, total) {
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * histogram[i];
+  let sumBackground = 0;
+  let weightBackground = 0;
+  let bestVariance = -1;
+  let bestThreshold = 160;
+  for (let i = 0; i < 256; i++) {
+    weightBackground += histogram[i];
+    if (!weightBackground) continue;
+    const weightForeground = total - weightBackground;
+    if (!weightForeground) break;
+    sumBackground += i * histogram[i];
+    const meanBackground = sumBackground / weightBackground;
+    const meanForeground = (sum - sumBackground) / weightForeground;
+    const variance = weightBackground * weightForeground * Math.pow(meanBackground - meanForeground, 2);
+    if (variance > bestVariance) {
+      bestVariance = variance;
+      bestThreshold = i;
+    }
+  }
+  return Math.max(85, Math.min(210, bestThreshold));
+}
+
+async function segmentTicketIntoLines(dataUrl) {
+  const image = await loadScannerImage(dataUrl);
+  const maxWidth = 1500;
+  const scale = Math.min(1, maxWidth / image.naturalWidth);
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0, width, height);
+  const pixels = ctx.getImageData(0, 0, width, height);
+  const gray = new Uint8Array(width * height);
+  const histogram = new Uint32Array(256);
+  for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+    const value = Math.round(pixels.data[i] * 0.299 + pixels.data[i + 1] * 0.587 + pixels.data[i + 2] * 0.114);
+    gray[p] = value;
+    histogram[value]++;
+  }
+  const threshold = scannerOtsuThreshold(histogram, gray.length);
+  const rowInk = new Uint32Array(height);
+  const edgeMargin = Math.max(2, Math.round(width * 0.02));
+  for (let y = 0; y < height; y++) {
+    let count = 0;
+    const offset = y * width;
+    for (let x = edgeMargin; x < width - edgeMargin; x++) {
+      if (gray[offset + x] < threshold) count++;
+    }
+    rowInk[y] = count;
+  }
+
+  const minimumInk = Math.max(4, Math.round(width * 0.004));
+  const active = Array.from(rowInk, function(count) { return count >= minimumInk; });
+  const bridge = Math.max(3, Math.round(height * 0.004));
+  let gapStart = -1;
+  for (let y = 0; y < height; y++) {
+    if (!active[y] && gapStart < 0) gapStart = y;
+    if (active[y] && gapStart >= 0) {
+      if (y - gapStart <= bridge && gapStart > 0) {
+        for (let fill = gapStart; fill < y; fill++) active[fill] = true;
+      }
+      gapStart = -1;
+    }
+  }
+
+  const segments = [];
+  let start = -1;
+  for (let y = 0; y <= height; y++) {
+    const on = y < height && active[y];
+    if (on && start < 0) start = y;
+    if (!on && start >= 0) {
+      const end = y - 1;
+      if (end - start + 1 >= Math.max(6, Math.round(height * 0.004))) segments.push({ start: start, end: end });
+      start = -1;
+    }
+  }
+
+  const crops = [];
+  segments.slice(0, 30).forEach(function(segment) {
+    const yPad = Math.max(6, Math.round((segment.end - segment.start + 1) * 0.28));
+    const y1 = Math.max(0, segment.start - yPad);
+    const y2 = Math.min(height - 1, segment.end + yPad);
+    let x1 = width - 1;
+    let x2 = 0;
+    let inkPixels = 0;
+    for (let y = segment.start; y <= segment.end; y++) {
+      const offset = y * width;
+      for (let x = edgeMargin; x < width - edgeMargin; x++) {
+        if (gray[offset + x] < threshold) {
+          x1 = Math.min(x1, x);
+          x2 = Math.max(x2, x);
+          inkPixels++;
+        }
       }
     }
+    if (!inkPixels || x2 <= x1) return;
+    const xPad = Math.max(10, Math.round((y2 - y1 + 1) * 0.4));
+    x1 = Math.max(0, x1 - xPad);
+    x2 = Math.min(width - 1, x2 + xPad);
+    const cropWidth = x2 - x1 + 1;
+    const cropHeight = y2 - y1 + 1;
+    const targetHeight = 96;
+    const lineScale = Math.max(1, Math.min(3, targetHeight / cropHeight));
+    const output = document.createElement("canvas");
+    output.width = Math.min(2200, Math.max(120, Math.round(cropWidth * lineScale) + 28));
+    output.height = Math.max(112, Math.round(cropHeight * lineScale) + 24);
+    const outputCtx = output.getContext("2d");
+    outputCtx.fillStyle = "#fff";
+    outputCtx.fillRect(0, 0, output.width, output.height);
+    outputCtx.imageSmoothingEnabled = true;
+    outputCtx.imageSmoothingQuality = "high";
+    outputCtx.drawImage(canvas, x1, y1, cropWidth, cropHeight, 14, 12, output.width - 28, output.height - 24);
+    crops.push({
+      image: output.toDataURL("image/png"),
+      y: segment.start,
+      inkPixels: inkPixels
+    });
+  });
+
+  if (!crops.length) {
+    crops.push({ image: canvas.toDataURL("image/png"), y: 0, inkPixels: 1 });
+  }
+  return {
+    crops: crops,
+    truncated: segments.length > 30,
+    detectedCount: segments.length
   };
 }
 
-function extractScannerResponseText(response) {
-  if (response && typeof response.output_text === "string") return response.output_text;
-  if (!response || !Array.isArray(response.output)) return null;
-  for (let i = 0; i < response.output.length; i++) {
-    const output = response.output[i];
-    if (!output || !Array.isArray(output.content)) continue;
-    for (let j = 0; j < output.content.length; j++) {
-      const content = output.content[j];
-      if (content && content.type === "output_text" && typeof content.text === "string") return content.text;
+function cleanLocalOcrText(value) {
+  return String(value || "")
+    .replace(/<s>|<\/s>|<pad>/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s|.,;:_-]+|[\s|.,;:_-]+$/g, "")
+    .trim();
+}
+
+function scannerExpandAbbreviations(value) {
+  return String(value || "").toLowerCase()
+    .replace(/\b(chx|chk|chkn|chik|chick)\b/g, "chicken")
+    .replace(/\bbf\b/g, "beef")
+    .replace(/\b(shmp|shrm|shrp)\b/g, "shrimp")
+    .replace(/\bpfr\b/g, "pork fried rice")
+    .replace(/\bcm\b/g, "chow mein")
+    .replace(/\blm\b/g, "lo mein")
+    .replace(/\bveg\b/g, "vegetable")
+    .replace(/\bkp\b/g, "kung pao")
+    .replace(/\bgen(?:eral)?\s*t(?:so|ao)s?\b/g, "general tso")
+    .replace(/\bs\s*&?\s*s\b/g, "sweet sour")
+    .replace(/\bw\//g, "with");
+}
+
+function scannerStripMenuCode(value) {
+  return String(value || "")
+    .replace(/^L(?:1[0-8]|[1-9])\.\s*/i, "")
+    .replace(/^No\.\s*[1-8]\s*/i, "")
+    .replace(/^Style\s+[A-D]\s*/i, "")
+    .trim();
+}
+
+function scannerWords(value) {
+  return scannerExpandAbbreviations(value)
+    .replace(/\b(mild|medium|med|spicy|hot|extra|ex|no|without|add)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(function(word) { return word.length > 1; });
+}
+
+function scannerEditDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let previous = new Array(b.length + 1);
+  let current = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) previous[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+    }
+    const swap = previous;
+    previous = current;
+    current = swap;
+  }
+  return previous[b.length];
+}
+
+function scannerMenuSimilarity(rawText, entry) {
+  const queryWords = scannerWords(rawText);
+  const candidateWords = scannerWords(scannerStripMenuCode(entry.cleanName));
+  if (!queryWords.length || !candidateWords.length) return 0;
+  const query = queryWords.join("");
+  const candidate = candidateWords.join("");
+  const maxLength = Math.max(query.length, candidate.length);
+  const charScore = maxLength ? 1 - scannerEditDistance(query, candidate) / maxLength : 0;
+  const querySet = new Set(queryWords);
+  const candidateSet = new Set(candidateWords);
+  let overlap = 0;
+  querySet.forEach(function(word) { if (candidateSet.has(word)) overlap++; });
+  const coverage = overlap / Math.max(1, Math.min(querySet.size, candidateSet.size));
+  let score = Math.max(charScore, charScore * 0.55 + coverage * 0.45);
+  if (candidate.indexOf(query) >= 0 || query.indexOf(candidate) >= 0) score = Math.max(score, 0.88);
+  return Math.max(0, Math.min(1, score));
+}
+
+function scannerDetectCode(rawText) {
+  const text = String(rawText || "");
+  let match = text.match(/\bL[\s.#-]*(1[0-8]|[1-9])\b/i);
+  if (match) return { type: "lunch", value: "L" + Number(match[1]) };
+  match = text.match(/\b(?:NO|N0)[\s.#-]*([1-8])\b/i);
+  if (match) return { type: "dinner", value: "No." + Number(match[1]) };
+  match = text.match(/\bSTYLE[\s.#-]*([A-D])\b/i);
+  if (match) return { type: "style", value: "Style " + match[1].toUpperCase() };
+  return null;
+}
+
+function scannerFindCodeEntry(code) {
+  if (!code) return -1;
+  return scannerMenuFlat.findIndex(function(entry) {
+    const name = scannerCleanName(entry.item.name);
+    if (code.type === "lunch") return name.toUpperCase().indexOf(code.value.toUpperCase() + ".") === 0;
+    if (code.type === "dinner") return name.toUpperCase() === code.value.toUpperCase();
+    return name.toUpperCase() === code.value.toUpperCase();
+  });
+}
+
+function scannerReadQuantity(rawText) {
+  const text = String(rawText || "");
+  let match = text.match(/^\s*(\d{1,2})\s*[x×]\b/i);
+  if (!match) match = text.match(/^\s*[x×]\s*(\d{1,2})\b/i);
+  return match ? Math.max(1, Math.min(99, Number(match[1]) || 1)) : 1;
+}
+
+function scannerReadModifiers(rawText) {
+  const text = String(rawText || "");
+  let spice = null;
+  if (/\b(?:ex|extra)\s*(?:spicy|hot)\b/i.test(text)) spice = "Ex Spicy";
+  else if (/\bspicy\b|\bhot\b/i.test(text)) spice = "Spicy";
+  else if (/\bmedium\b|\bmed\b/i.test(text)) spice = "Medium";
+  else if (/\bmild\b/i.test(text)) spice = "Mild";
+  let rice = null;
+  if (/\bpfr\b|pork\s+fried\s+rice/i.test(text)) rice = "Pork Fried Rice";
+  else if (/steam(?:ed)?\s+rice/i.test(text)) rice = "Steamed Rice";
+  const noteMatch = text.match(/\b(no|without|extra|add|sub)\b.+$/i);
+  return {
+    spice_level: spice,
+    rice: rice,
+    notes: noteMatch ? noteMatch[0].trim() : null
+  };
+}
+
+function scannerDayPartFromLines(lines) {
+  const combined = lines.join(" ");
+  if (/\blunch\b/i.test(combined)) return "lunch";
+  if (/\bdinner\b/i.test(combined)) return "dinner";
+  return "unclear";
+}
+
+function scannerLooksLikeHeader(rawText, index, total) {
+  if (index > Math.max(2, Math.ceil(total * 0.35))) return false;
+  return /\b(table|name|order|ticket|server|guest|dine|take\s*out|pickup|date|time|lunch|dinner)\b/i.test(rawText);
+}
+
+function scannerFormatCandidate(entry) {
+  return entry.category + " · " + entry.cleanName + " · $" + Number(entry.item.price).toFixed(2);
+}
+
+function scannerMatchLocalLine(rawText, dayPart) {
+  const quantity = scannerReadQuantity(rawText);
+  const modifiers = scannerReadModifiers(rawText);
+  const code = scannerDetectCode(rawText);
+  const codeIndex = scannerFindCodeEntry(code);
+  if (codeIndex >= 0) {
+    const entry = scannerMenuFlat[codeIndex];
+    return {
+      raw_text: rawText,
+      quantity: quantity,
+      matched_item: entry.cleanName,
+      category: entry.category,
+      price_each: Number(entry.item.price),
+      modifiers: modifiers,
+      ambiguous: false,
+      ambiguous_candidates: [],
+      confidence: "high",
+      needs_review: false
+    };
+  }
+
+  let scored = scannerMenuFlat.map(function(entry, index) {
+    return { entry: entry, index: index, score: scannerMenuSimilarity(rawText, entry) };
+  }).sort(function(a, b) { return b.score - a.score; });
+
+  if (dayPart === "lunch") {
+    const lunchCandidates = scored.filter(function(candidate) { return candidate.entry.category === "Lunch Menu"; });
+    if (lunchCandidates.length && lunchCandidates[0].score >= scored[0].score - 0.08) scored = lunchCandidates.concat(scored.filter(function(candidate) { return candidate.entry.category !== "Lunch Menu"; }));
+  } else if (dayPart === "dinner") {
+    const dinnerCandidates = scored.filter(function(candidate) { return candidate.entry.category !== "Lunch Menu"; });
+    if (dinnerCandidates.length) scored = dinnerCandidates;
+  }
+
+  const top = scored[0];
+  const second = scored[1];
+  if (!top || top.score < 0.52) {
+    return {
+      raw_text: rawText || "[illegible]",
+      quantity: quantity,
+      matched_item: null,
+      category: null,
+      price_each: null,
+      modifiers: modifiers,
+      ambiguous: false,
+      ambiguous_candidates: [],
+      confidence: "low",
+      needs_review: true
+    };
+  }
+
+  const topBase = scannerNormalizedName(scannerStripMenuCode(top.entry.cleanName));
+  const sameName = scored.filter(function(candidate) {
+    return scannerNormalizedName(scannerStripMenuCode(candidate.entry.cleanName)) === topBase &&
+      candidate.entry.category !== top.entry.category;
+  });
+  const closeTie = second && second.score >= 0.55 && top.score - second.score < 0.055;
+  if ((sameName.length && dayPart === "unclear") || closeTie) {
+    const possibilities = [top].concat(sameName).concat(closeTie ? [second] : []);
+    const seen = new Set();
+    const candidates = possibilities.filter(function(candidate) {
+      const key = candidate.entry.category + "::" + candidate.entry.cleanName;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 5);
+    return {
+      raw_text: rawText,
+      quantity: quantity,
+      matched_item: null,
+      category: null,
+      price_each: null,
+      modifiers: modifiers,
+      ambiguous: true,
+      ambiguous_candidates: candidates.map(function(candidate) { return scannerFormatCandidate(candidate.entry); }),
+      confidence: "medium",
+      needs_review: true
+    };
+  }
+
+  const gap = second ? top.score - second.score : top.score;
+  const high = top.score >= 0.78 && gap >= 0.08;
+  return {
+    raw_text: rawText,
+    quantity: quantity,
+    matched_item: top.entry.cleanName,
+    category: top.entry.category,
+    price_each: Number(top.entry.item.price),
+    modifiers: modifiers,
+    ambiguous: false,
+    ambiguous_candidates: [],
+    confidence: high ? "high" : "medium",
+    needs_review: !high
+  };
+}
+
+async function recognizeTicketLocally(dataUrl) {
+  const segmentation = await segmentTicketIntoLines(dataUrl);
+  const recognizer = await loadScannerOcrPipeline();
+  const rawLines = [];
+  for (let i = 0; i < segmentation.crops.length; i++) {
+    setScannerStatus("working", "Reading handwritten line " + (i + 1) + " of " + segmentation.crops.length + " on this device…");
+    try {
+      const output = await recognizer(segmentation.crops[i].image, { max_new_tokens: 64 });
+      const generated = Array.isArray(output) && output[0] ? output[0].generated_text : "";
+      rawLines.push(cleanLocalOcrText(generated) || "[illegible mark]");
+    } catch (error) {
+      console.warn("Local OCR could not read line", i + 1, error);
+      rawLines.push("[illegible mark]");
     }
   }
-  return null;
+
+  const dayPart = scannerDayPartFromLines(rawLines);
+  const headerLines = [];
+  const orderLines = [];
+  rawLines.forEach(function(line, index) {
+    if (scannerLooksLikeHeader(line, index, rawLines.length)) headerLines.push(line);
+    else orderLines.push(line);
+  });
+  const items = orderLines.map(function(line) { return scannerMatchLocalLine(line, dayPart); });
+  const unreadable = items.filter(function(item) { return item.confidence === "low"; }).length;
+  const ambiguous = items.filter(function(item) { return item.ambiguous; }).length;
+  const flags = ["Local handwriting OCR is approximate; confirm every line before sending the order to the kitchen."];
+  if (dayPart === "unclear") flags.push("No reliable lunch or dinner indicator was recognized.");
+  if (unreadable) flags.push(unreadable + " line" + (unreadable === 1 ? " could" : "s could") + " not be matched confidently.");
+  if (ambiguous) flags.push(ambiguous + " line" + (ambiguous === 1 ? " has" : "s have") + " multiple possible menu matches.");
+  if (segmentation.truncated) flags.push("More than 30 marks were detected; only the first 30 regions were processed.");
+  return {
+    ticket_read: {
+      legible: rawLines.some(function(line) { return line !== "[illegible mark]"; }),
+      day_part_hint: dayPart,
+      header_notes: headerLines.length ? headerLines.join(" · ") : null
+    },
+    items: items,
+    subtotal_estimate: 0,
+    flags: flags
+  };
 }
 
 async function analyzeTicket() {
@@ -1741,85 +2079,34 @@ async function analyzeTicket() {
     setScannerStatus("error", "Choose or photograph a ticket first.");
     return;
   }
-
-  const mode = document.getElementById("scannerConnectionMode").value;
-  const model = document.getElementById("scannerModel").value.trim() || "gpt-5.4-mini";
   const button = document.getElementById("analyzeTicketBtn");
   button.disabled = true;
   button.textContent = "Reading Ticket…";
-  setScannerStatus("working", "Reading every line and checking it against the menu. This can take a moment.");
-
+  setScannerStatus("working", scannerOcrPipeline ? "Finding handwritten lines on this device…" : "Preparing the free local handwriting reader…");
   try {
-    let result;
-    if (mode === "direct") {
-      const apiKey = document.getElementById("scannerApiKey").value.trim();
-      if (!apiKey) throw new Error("Enter an OpenAI API key. It is used for this session only and is not saved.");
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + apiKey
-        },
-        body: JSON.stringify(getTicketRequestPayload(model))
-      });
-      const responseJson = await response.json().catch(function() { return {}; });
-      if (!response.ok) {
-        const apiMessage = responseJson && responseJson.error && responseJson.error.message;
-        throw new Error(apiMessage || "OpenAI returned an error (" + response.status + ").");
-      }
-      const responseText = extractScannerResponseText(responseJson);
-      if (!responseText) throw new Error("The AI response did not contain a ticket result.");
-      result = JSON.parse(responseText);
-    } else {
-      const endpoint = document.getElementById("scannerProxyEndpoint").value.trim();
-      if (!endpoint) throw new Error("Enter the secure server endpoint.");
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_data_url: scannerImageDataUrl,
-          model: model,
-          instructions: getTicketScannerInstructions(),
-          schema: TICKET_RESPONSE_SCHEMA
-        })
-      });
-      const responseJson = await response.json().catch(function() { return {}; });
-      if (!response.ok) {
-        const proxyMessage = responseJson && (responseJson.error || responseJson.message);
-        throw new Error(typeof proxyMessage === "string" ? proxyMessage : "The ticket server returned an error (" + response.status + ").");
-      }
-      if (responseJson.ticket_read) {
-        result = responseJson;
-      } else {
-        const responseText = extractScannerResponseText(responseJson);
-        if (!responseText) throw new Error("The ticket server did not return a ticket result.");
-        result = JSON.parse(responseText);
-      }
-    }
-
+    const result = await recognizeTicketLocally(scannerImageDataUrl);
     scannerResult = normalizeScannerResult(result);
     renderScannerResults();
     const reviewCount = scannerResult.items.filter(function(item) { return item.needs_review; }).length;
     setScannerStatus(
       "success",
-      "Ticket read: " + scannerResult.items.length + " line" + (scannerResult.items.length === 1 ? "" : "s") +
-      (reviewCount ? ". " + reviewCount + " need" + (reviewCount === 1 ? "s" : "") + " human review." : ". All lines have high-confidence matches.")
+      "Local scan complete: " + scannerResult.items.length + " line" + (scannerResult.items.length === 1 ? "" : "s") +
+      (reviewCount ? ". " + reviewCount + " need" + (reviewCount === 1 ? "s" : "") + " human review." : ". All recognized lines have strong menu matches.")
     );
     haptic("success");
   } catch (error) {
-    console.error("Ticket scan failed", error);
-    let message = error && error.message ? error.message : "The ticket could not be analyzed.";
-    if (/failed to fetch/i.test(message)) {
-      message = "The API connection was blocked or unavailable. Check the internet connection, or use the secure-server option.";
-    }
-    if (/JSON/i.test(message) && /position|token|parse/i.test(message)) {
-      message = "The AI returned an unreadable result. Please try the photo again.";
+    console.error("Local ticket scan failed", error);
+    let message = error && error.message ? error.message : "The ticket could not be read locally.";
+    if (/fetch|network|import|module|load/i.test(message)) {
+      message = "The free handwriting model could not download. Check the internet connection, reload the page, and try again.";
+    } else {
+      message = "The ticket could not be read locally. Try a clearer, tightly cropped photo with strong lighting.";
     }
     setScannerStatus("error", message);
     haptic("error");
   } finally {
     button.disabled = !scannerImageDataUrl;
-    button.textContent = "Analyze Ticket";
+    button.textContent = "Read Ticket Locally";
   }
 }
 

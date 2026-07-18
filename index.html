@@ -281,7 +281,6 @@
     .receipt-card .r-spice { font-size: 11px; }
     .receipt-card .r-custom { font-size: 11px; padding-left: 24px; }
     .receipt-card .r-total { font-size: 22px; padding: 6px 0; }
-    .receipt-card #rSubtotalRow, .receipt-card #rTaxRow { font-size: 14px !important; }
     .receipt-card .r-tip-section { padding: 8px 0; }
     .receipt-card .r-tip-title { font-size: 13px; margin-bottom: 4px; }
     .receipt-card .r-tip-row { font-size: 14px; padding: 4px 0; }
@@ -710,6 +709,32 @@
   body.dark .scanner-memory { background: #1f1f1f; border-color: #333; }
   body.dark .scanner-memory-row { background: #262626; }
   body.dark .scanner-memory-title, body.dark .scanner-memory-row .to { color: #e8e4dc; }
+  .scanner-picker { position: relative; }
+  .scanner-picker-current { display: flex; align-items: center; gap: 8px; padding: 10px 12px; min-height: 44px;
+    border: 1px solid #cfc8bc; border-radius: 8px; background: #fff; font-size: 14px; cursor: pointer; }
+  .scanner-picker-current.unset { color: #9a938a; font-style: italic; }
+  .scanner-picker-current .chev { margin-left: auto; opacity: 0.5; flex: 0 0 auto; }
+  .scanner-picker-current .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scanner-picker-search { display: none; }
+  .scanner-picker.open .scanner-picker-search { display: block; }
+  .scanner-picker.open .scanner-picker-current { display: none; }
+  .scanner-picker-input { width: 100%; padding: 10px 12px; min-height: 44px; font-size: 16px;
+    border: 1.5px solid #0f766e; border-radius: 8px; background: #fff; }
+  .scanner-picker-results { margin-top: 4px; max-height: 260px; overflow-y: auto; border: 1px solid #e3ded4;
+    border-radius: 8px; background: #fff; }
+  .scanner-picker-result { display: flex; align-items: center; gap: 8px; padding: 11px 12px; min-height: 46px;
+    font-size: 14px; cursor: pointer; border-bottom: 1px solid #f0ece4; }
+  .scanner-picker-result:last-child { border-bottom: none; }
+  .scanner-picker-result:active, .scanner-picker-result.active { background: #f0fdfa; }
+  .scanner-picker-result .cat { font-size: 11px; color: #8b857d; flex: 0 0 auto; }
+  .scanner-picker-result .nm { font-weight: 600; color: #3c3a35; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scanner-picker-result .pr { color: #0f766e; font-weight: 600; flex: 0 0 auto; }
+  .scanner-picker-result.custom .nm { color: #0f766e; font-style: italic; }
+  .scanner-picker-empty { padding: 12px; font-size: 13px; color: #8b857d; text-align: center; }
+  body.dark .scanner-picker-current, body.dark .scanner-picker-input,
+  body.dark .scanner-picker-results { background: #222; border-color: #3a3a3a; color: #e8e4dc; }
+  body.dark .scanner-picker-result { border-color: #303030; }
+  body.dark .scanner-picker-result .nm { color: #e8e4dc; }
   .scanner-suggestions { margin-top: 10px; }
   .scanner-suggestions .scanner-mini-label { display: block; margin-bottom: 6px; }
   .scanner-suggest-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -837,10 +862,6 @@
     </div>
     <div class="order-footer">
       <div class="order-meta" id="orderMeta" style="display:none"><span id="metaCount"></span><span id="metaInfo"></span></div>
-      <div class="cart-tax-row" id="cartTaxRow" style="display:none;">
-        <div class="cart-subline"><span>Subtotal</span><span id="cartSubtotal">$0.00</span></div>
-        <div class="cart-subline"><span id="cartTaxLabel">Tax</span><span id="cartTax">$0.00</span></div>
-      </div>
       <div class="total-row">
         <span class="total-label" id="totalLabel">TOTAL</span>
         <span class="total-amount" id="totalAmount">$0.00</span>
@@ -1124,8 +1145,6 @@
     <div class="r-divider"></div>
     <div id="rItems"></div>
     <div class="r-divider thick"></div>
-    <div class="r-total" id="rSubtotalRow" style="display:none;font-size:60px;"><span>SUBTOTAL</span><span id="rSubtotal"></span></div>
-    <div class="r-total" id="rTaxRow" style="display:none;font-size:60px;"><span id="rTaxLabel">TAX</span><span id="rTaxAmount"></span></div>
     <div class="r-total"><span>TOTAL</span><span class="r-total-amt" id="rTotal"></span></div>
     <div id="rSplitSection" style="display:none;">
       <div class="r-divider"></div>
@@ -1148,7 +1167,6 @@
     <div class="r-footer">Thank you for your order!</div>
   </div>
   <div class="receipt-config">
-    <label>Tax %: <input type="number" id="taxRateInput" min="0" max="20" step="0.1" value="0" oninput="updateTaxRate(this.value)"></label>
     <label>Split: <button onclick="changeSplit(-1)" style="background:#fff;border:1px solid #ccc;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;">−</button> <span id="splitDisplay" style="min-width:18px;text-align:center;font-weight:700;">1</span> <button onclick="changeSplit(1)" style="background:#fff;border:1px solid #ccc;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;">+</button></label>
   </div>
   <div class="receipt-actions">
@@ -3527,6 +3545,7 @@ async function analyzeTicket() {
   setScannerStatus("working", scannerOcrPipeline ? "Finding handwritten lines on this device…" : "Preparing the free local handwriting reader…");
   try {
     const result = await recognizeTicketLocally(scannerImageDataUrl);
+    scannerPickerState = {};
     scannerResult = normalizeScannerResult(result);
     renderScannerResults();
     const reviewCount = scannerResult.items.filter(function(item) { return item.needs_review; }).length;
@@ -3660,6 +3679,149 @@ function scannerMenuOptions(selectedIndex, customSelected) {
   return options;
 }
 
+// Open search boxes, keyed by line index. Kept outside the DOM because the
+// review list re-renders wholesale after every edit, which would otherwise
+// wipe whatever the user was in the middle of typing.
+let scannerPickerState = {};
+
+function scannerSearchMenu(query) {
+  const raw = String(query || "").trim().toLowerCase();
+  if (!raw) {
+    // No query yet: show the most useful default, which is the menu in order.
+    return scannerMenuFlat.map(function(entry, index) { return { index: index, entry: entry, rank: index }; }).slice(0, 40);
+  }
+  const searchNorm = raw.replace(/[^a-z0-9]/g, "");
+  const results = [];
+  scannerMenuFlat.forEach(function(entry, index) {
+    // Reuse the POS search scoring so the scanner behaves like the rest of
+    // the app, then fall back to the scanner's own OCR-tolerant matcher.
+    let rank = scoreSearchMatch(raw, searchNorm, entry.item);
+    if (rank === null || rank === undefined) {
+      const loose = typeof scoreLooseMatch === "function" ? scoreLooseMatch(raw, entry.item) : null;
+      if (loose !== null && loose !== undefined) rank = loose + 10;
+    }
+    if (rank === null || rank === undefined) {
+      // "no.4", "#4" and "4" should all find the No.4 combo.
+      const codeMatch = raw.match(/^(?:no\.?\s*|#\s*|l\s*)?(\d{1,2})$/);
+      if (codeMatch) {
+        const name = entry.cleanName.toLowerCase();
+        if (new RegExp("^(?:no\\.?\\s*|l)" + codeMatch[1] + "\\b").test(name)) rank = 5;
+      }
+    }
+    // Category is a first-class match, not just a tie-breaker: typing
+    // "beverages" should list the drinks even though no drink is named that.
+    const categoryLower = entry.category.toLowerCase();
+    if (rank === null || rank === undefined) {
+      if (categoryLower.indexOf(raw) >= 0 || (raw.length >= 4 && raw.indexOf(categoryLower) >= 0)) rank = 8;
+    } else if (categoryLower.indexOf(raw) >= 0) {
+      rank -= 0.5;
+    }
+    if (rank === null || rank === undefined) {
+      // Last resort, and deliberately strict. A loose threshold here made
+      // "beverage" match "General Tso" on incidental shared letters.
+      const similarity = scannerMenuSimilarity(raw, entry);
+      if (similarity >= 0.78) rank = 20 + (1 - similarity) * 10;
+    }
+    if (rank !== null && rank !== undefined) {
+      results.push({ index: index, entry: entry, rank: rank });
+    }
+  });
+  return results.sort(function(a, b) {
+    return a.rank - b.rank || a.entry.cleanName.length - b.entry.cleanName.length;
+  }).slice(0, 40);
+}
+
+function scannerPickerMarkup(item, index) {
+  const state = scannerPickerState[index];
+  const open = Boolean(state && state.open);
+  const query = state ? state.query : "";
+  let current;
+  if (item._custom) current = scannerEsc(item.matched_item || "Custom item");
+  else if (item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex]) {
+    const entry = scannerMenuFlat[item._menuIndex];
+    current = scannerEsc(entry.cleanName + " · $" + Number(entry.item.price).toFixed(2));
+  } else current = null;
+
+  return '<div class="scanner-picker' + (open ? " open" : "") + '" data-picker="' + index + '">' +
+    '<div class="scanner-picker-current' + (current ? "" : " unset") + '" data-picker-open="' + index + '" ' +
+      'role="button" tabindex="0" aria-label="Choose menu item for line ' + (index + 1) + '">' +
+      '<span class="label">' + (current || "— Tap to search the menu —") + "</span>" +
+      '<span class="chev">▾</span>' +
+    "</div>" +
+    '<div class="scanner-picker-search">' +
+      '<input class="scanner-picker-input" type="search" inputmode="search" autocomplete="off" ' +
+        'placeholder="Type an item name, or 4 for No.4…" value="' + scannerEsc(query) + '" data-picker-input="' + index + '">' +
+      '<div class="scanner-picker-results" data-picker-results="' + index + '">' + scannerPickerResults(index, query, item) + "</div>" +
+    "</div>" +
+  "</div>";
+}
+
+function scannerPickerResults(index, query, item) {
+  const matches = scannerSearchMenu(query);
+  let html = matches.map(function(match) {
+    return '<div class="scanner-picker-result" data-picker-pick="' + index + '" data-menu-index="' + match.index + '">' +
+      '<span class="nm">' + scannerEsc(match.entry.cleanName) + "</span>" +
+      '<span class="cat">' + scannerEsc(match.entry.category) + "</span>" +
+      '<span class="pr">$' + Number(match.entry.item.price).toFixed(2) + "</span>" +
+    "</div>";
+  }).join("");
+  if (!matches.length) html = '<div class="scanner-picker-empty">No menu item matches that.</div>';
+  // Always offer the escape hatch of billing exactly what was written.
+  const customName = scannerCustomItemName(query || (item && item.raw_text) || "");
+  if (customName) {
+    html += '<div class="scanner-picker-result custom" data-picker-pick="' + index + '" data-menu-index="custom">' +
+      '<span class="nm">Use “' + scannerEsc(customName) + '” as a custom item</span>' +
+    "</div>";
+  }
+  return html;
+}
+
+function bindScannerPicker(container) {
+  container.querySelectorAll("[data-picker-open]").forEach(function(node) {
+    function open() {
+      const index = Number(node.dataset.pickerOpen);
+      scannerPickerState[index] = { open: true, query: "" };
+      renderScannerResults();
+      const input = document.querySelector('[data-picker-input="' + index + '"]');
+      if (input) input.focus();
+    }
+    node.addEventListener("click", open);
+    node.addEventListener("keydown", function(event) {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
+    });
+  });
+
+  container.querySelectorAll("[data-picker-input]").forEach(function(input) {
+    const index = Number(input.dataset.pickerInput);
+    // Filter in place. A full re-render on every keystroke would steal focus
+    // and drop the caret on a phone keyboard.
+    input.addEventListener("input", function() {
+      scannerPickerState[index] = { open: true, query: this.value };
+      const results = document.querySelector('[data-picker-results="' + index + '"]');
+      if (results) results.innerHTML = scannerPickerResults(index, this.value, scannerResult.items[index]);
+    });
+    input.addEventListener("keydown", function(event) {
+      if (event.key === "Escape") {
+        delete scannerPickerState[index];
+        renderScannerResults();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        const first = document.querySelector('[data-picker-results="' + index + '"] .scanner-picker-result');
+        if (first) first.click();
+      }
+    });
+  });
+
+  container.querySelectorAll("[data-picker-pick]").forEach(function(node) {
+    node.addEventListener("click", function() {
+      const index = Number(this.dataset.pickerPick);
+      haptic("light");
+      delete scannerPickerState[index];
+      updateScannerItem(index, "match", this.dataset.menuIndex);
+    });
+  });
+}
+
 function renderScannerMemoryPanel() {
   const panel = document.getElementById("scannerMemoryPanel");
   if (!panel) return;
@@ -3765,7 +3927,7 @@ function renderScannerResults() {
         linePreview +
         '<div class="scanner-item-grid">' +
           '<div><label class="scanner-mini-label">Quantity</label><input type="number" min="1" max="99" value="' + item.quantity + '" data-scanner-field="quantity" data-index="' + index + '"></div>' +
-          '<div class="wide"><label class="scanner-mini-label">Confirmed item</label><select data-scanner-field="match" data-index="' + index + '">' + scannerMenuOptions(item._menuIndex, item._custom) + "</select></div>" +
+          '<div class="wide"><label class="scanner-mini-label">Confirmed item</label>' + scannerPickerMarkup(item, index) + "</div>" +
           customPrice +
           '<div><label class="scanner-mini-label">Confidence</label><select data-scanner-field="confidence" data-index="' + index + '">' +
             '<option value="high"' + (item.confidence === "high" ? " selected" : "") + ">High</option>" +
@@ -3827,6 +3989,7 @@ function renderScannerResults() {
       updateScannerItem(Number(this.dataset.index), this.dataset.scannerField, this.value);
     });
   });
+  bindScannerPicker(container);
   container.querySelectorAll("[data-scanner-suggest]").forEach(function(button) {
     button.addEventListener("click", function() {
       haptic("light");
@@ -4095,7 +4258,7 @@ let orderHistory = [];
 let favorites = new Set();
 
 // Tax rate (percentage) and tip presets
-let taxRate = 0; // 0 = no tax (Oregon default)
+let taxRate = 0; // no sales tax; kept at 0 so any stray reference stays harmless
 let splitWays = 1; // split check ways
 
 // Spice modal state
@@ -4553,28 +4716,15 @@ function toggleFavorite(itemKey) {
   renderMenuItems();
 }
 
-// ─── TAX RATE ───
+// ─── TAX RATE (removed) ───
+// This restaurant charges no sales tax. The rate used to be adjustable and was
+// saved per device, so devices that had it set to 5% would keep applying it
+// even after the default changed. Clear that stored value on load, otherwise
+// the old rate silently comes back on exactly the machines already affected.
 const TAX_STORAGE_KEY = 'fourSeasonTaxRate';
-function saveTaxRate() { try { localStorage.setItem(TAX_STORAGE_KEY, String(taxRate)); } catch(e) {} }
-function loadTaxRate() {
-  try {
-    const raw = localStorage.getItem(TAX_STORAGE_KEY);
-    if (raw != null) {
-      const n = parseFloat(raw);
-      if (!isNaN(n) && n >= 0 && n <= 30) taxRate = n;
-    }
-  } catch(e) {}
-}
-function updateTaxRate(val) {
-  const n = parseFloat(val);
-  if (isNaN(n) || n < 0 || n > 30) return;
-  taxRate = n;
-  saveTaxRate();
-  // Re-render cart and receipt
-  renderOrder();
-  if (document.getElementById("receiptPage").classList.contains("show")) {
-    _renderReceiptCard();
-  }
+function clearStoredTaxRate() {
+  taxRate = 0;
+  try { localStorage.removeItem(TAX_STORAGE_KEY); } catch(e) {}
 }
 
 // ─── SPLIT CHECK ───
@@ -6510,23 +6660,10 @@ function renderOrder() {
     document.getElementById("metaInfo").textContent = "#" + orderNumber + " · " + orderType;
   }
 
+  // No sales tax. The total is simply the sum of the line items.
   const subtotal = order.reduce((s, i) => s + i.price * i.qty, 0);
-  const taxAmount = subtotal * (taxRate / 100);
-  const grandTotal = subtotal + taxAmount;
-  const taxRow = document.getElementById("cartTaxRow");
-  const totalLabel = document.getElementById("totalLabel");
-  if (taxRate > 0 && subtotal > 0) {
-    taxRow.style.display = "block";
-    document.getElementById("cartSubtotal").textContent = fp(subtotal);
-    document.getElementById("cartTaxLabel").textContent = `Tax (${taxRate}%)`;
-    document.getElementById("cartTax").textContent = fp(taxAmount);
-    totalLabel.textContent = "TOTAL";
-    document.getElementById("totalAmount").textContent = fp(grandTotal);
-  } else {
-    taxRow.style.display = "none";
-    totalLabel.textContent = "TOTAL";
-    document.getElementById("totalAmount").textContent = fp(subtotal);
-  }
+  document.getElementById("totalLabel").textContent = "TOTAL";
+  document.getElementById("totalAmount").textContent = fp(subtotal);
   updateMobileCartBadge();
 }
 
@@ -6578,9 +6715,7 @@ function completeOrder() {
   if (!confirm(`Send this order to the kitchen?\n\n${count} item${count !== 1 ? 's' : ''} — ${fp(total)}`)) return;
   haptic('success');
 
-  // Sync tax rate input to current value, reset split for new receipt
-  const taxInput = document.getElementById("taxRateInput");
-  if (taxInput) taxInput.value = taxRate;
+  // Reset split for new receipt
   splitWays = 1;
   document.getElementById("splitDisplay").textContent = splitWays;
   
@@ -6595,23 +6730,12 @@ function completeOrder() {
 
 function _renderReceiptCard() {
   const subtotal = order.reduce((s, i) => s + i.price * i.qty, 0);
-  const taxAmount = subtotal * (taxRate / 100);
-  const total = subtotal + taxAmount;
+  const total = subtotal;
 
   document.getElementById("rOrderNum").textContent = "Order #" + orderNumber;
   document.getElementById("rOrderType").textContent = orderType;
   document.getElementById("rTime").textContent = getDateTime();
   document.getElementById("rTotal").textContent = fp(total);
-  
-  // Show/hide subtotal and tax rows
-  const showTax = taxRate > 0;
-  document.getElementById("rSubtotalRow").style.display = showTax ? "flex" : "none";
-  document.getElementById("rTaxRow").style.display = showTax ? "flex" : "none";
-  if (showTax) {
-    document.getElementById("rSubtotal").textContent = fp(subtotal);
-    document.getElementById("rTaxLabel").textContent = `TAX (${taxRate}%)`;
-    document.getElementById("rTaxAmount").textContent = fp(taxAmount);
-  }
   
   // Split check
   const splitSection = document.getElementById("rSplitSection");
@@ -7091,11 +7215,8 @@ loadUnavailable();
 loadHistory();
 updateHistoryBadge();
 loadFavorites();
-loadTaxRate();
+clearStoredTaxRate();
 loadSettingsPrefs();
-// Sync tax input with stored value
-const _taxInput = document.getElementById("taxRateInput");
-if (_taxInput) _taxInput.value = taxRate;
 loadCart(); // creates tabs[] and activates a tab; handles syncing UI fields
 // Note: loadCart already handles orderType toggle sync via activateTab
 updateClock();

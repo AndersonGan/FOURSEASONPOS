@@ -1703,64 +1703,76 @@ function scannerDetectPaperBounds(image) {
   }
   const paperLuminance = Math.max(88, Math.min(155,
     scannerOtsuThreshold(luminanceHistogram, locatorWidth * locatorHeight) + 8));
-  const mask = new Uint8Array(locatorWidth * locatorHeight);
-  for (let p = 0, i = 0; p < mask.length; p++, i += 4) {
+  const locatorLuminance = new Uint8Array(locatorWidth * locatorHeight);
+  const locatorSaturation = new Float32Array(locatorWidth * locatorHeight);
+  for (let p = 0, i = 0; p < locatorLuminance.length; p++, i += 4) {
     const red = locatorPixels[i];
     const green = locatorPixels[i + 1];
     const blue = locatorPixels[i + 2];
     const maximum = Math.max(red, green, blue);
     const minimum = Math.min(red, green, blue);
-    const saturation = maximum ? (maximum - minimum) / maximum : 0;
-    const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
-    // The paper is warm but much less saturated than the gold tabletop. A
-    // tighter cutoff prevents the table from joining the ticket component.
-    if (luminance >= paperLuminance && saturation <= 0.50) mask[p] = 1;
+    locatorSaturation[p] = maximum ? (maximum - minimum) / maximum : 0;
+    locatorLuminance[p] = Math.round(red * 0.299 + green * 0.587 + blue * 0.114);
   }
 
-  const stack = new Int32Array(mask.length);
-  let best = null;
-  for (let seed = 0; seed < mask.length; seed++) {
-    if (!mask[seed]) continue;
-    let stackSize = 0;
-    stack[stackSize++] = seed;
-    mask[seed] = 0;
-    let count = 0;
-    let minX = locatorWidth;
-    let maxX = 0;
-    let minY = locatorHeight;
-    let maxY = 0;
-    while (stackSize) {
-      const point = stack[--stackSize];
-      const x = point % locatorWidth;
-      const y = Math.floor(point / locatorWidth);
-      count++;
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-      if (x > 0 && mask[point - 1]) {
-        mask[point - 1] = 0;
-        stack[stackSize++] = point - 1;
+  function findPaperComponent(saturationLimit) {
+    const mask = new Uint8Array(locatorLuminance.length);
+    for (let p = 0; p < mask.length; p++) {
+      if (locatorLuminance[p] >= paperLuminance && locatorSaturation[p] <= saturationLimit) mask[p] = 1;
+    }
+    const stack = new Int32Array(mask.length);
+    let bestComponent = null;
+    for (let seed = 0; seed < mask.length; seed++) {
+      if (!mask[seed]) continue;
+      let stackSize = 0;
+      stack[stackSize++] = seed;
+      mask[seed] = 0;
+      let count = 0;
+      let minX = locatorWidth;
+      let maxX = 0;
+      let minY = locatorHeight;
+      let maxY = 0;
+      while (stackSize) {
+        const point = stack[--stackSize];
+        const x = point % locatorWidth;
+        const y = Math.floor(point / locatorWidth);
+        count++;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+        if (x > 0 && mask[point - 1]) {
+          mask[point - 1] = 0;
+          stack[stackSize++] = point - 1;
+        }
+        if (x + 1 < locatorWidth && mask[point + 1]) {
+          mask[point + 1] = 0;
+          stack[stackSize++] = point + 1;
+        }
+        if (y > 0 && mask[point - locatorWidth]) {
+          mask[point - locatorWidth] = 0;
+          stack[stackSize++] = point - locatorWidth;
+        }
+        if (y + 1 < locatorHeight && mask[point + locatorWidth]) {
+          mask[point + locatorWidth] = 0;
+          stack[stackSize++] = point + locatorWidth;
+        }
       }
-      if (x + 1 < locatorWidth && mask[point + 1]) {
-        mask[point + 1] = 0;
-        stack[stackSize++] = point + 1;
-      }
-      if (y > 0 && mask[point - locatorWidth]) {
-        mask[point - locatorWidth] = 0;
-        stack[stackSize++] = point - locatorWidth;
-      }
-      if (y + 1 < locatorHeight && mask[point + locatorWidth]) {
-        mask[point + locatorWidth] = 0;
-        stack[stackSize++] = point + locatorWidth;
+      const boxArea = (maxX - minX + 1) * (maxY - minY + 1);
+      const edgeTouches = Number(minX <= 2) + Number(maxX >= locatorWidth - 3) +
+        Number(minY <= 2) + Number(maxY >= locatorHeight - 3);
+      if (edgeTouches >= 2) continue;
+      if ((!bestComponent || count > bestComponent.count) &&
+          count >= mask.length * 0.06 && boxArea >= mask.length * 0.12) {
+        bestComponent = { count: count, minX: minX, maxX: maxX, minY: minY, maxY: maxY };
       }
     }
-    const boxArea = (maxX - minX + 1) * (maxY - minY + 1);
-    if ((!best || count > best.count) &&
-        count >= mask.length * 0.06 && boxArea >= mask.length * 0.12) {
-      best = { count: count, minX: minX, maxX: maxX, minY: minY, maxY: maxY };
-    }
+    return bestComponent;
   }
+
+  // First separate neutral white/pink checks from similarly bright tabletops.
+  // Warm yellow checks need the more permissive fallback used by older photos.
+  const best = findPaperComponent(0.28) || findPaperComponent(0.50);
 
   if (!best) {
     return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
@@ -1915,7 +1927,7 @@ async function segmentTicketIntoLines(dataUrl) {
   const scanXStart = formMode ? Math.max(edgeMargin, Math.round(width * 0.18)) : edgeMargin;
   const scanXEnd = formMode ? Math.min(width - edgeMargin, Math.round(width * 0.64)) : width - edgeMargin;
   const scanYStart = formMode ? Math.round(height * 0.22) : 0;
-  const scanYEnd = formMode ? Math.round(height * 0.90) : height;
+  const scanYEnd = formMode ? Math.round(height * 0.87) : height;
   const rowInk = new Uint32Array(height);
   for (let y = scanYStart; y < scanYEnd; y++) {
     if (ruleRows[y]) continue;
@@ -1999,8 +2011,18 @@ async function segmentTicketIntoLines(dataUrl) {
     outputCtx.imageSmoothingEnabled = true;
     outputCtx.imageSmoothingQuality = "high";
     outputCtx.drawImage(cleanedCanvas, x1, y1, cropWidth, cropHeight, 14, 12, output.width - 28, output.height - 24);
+    const alternate = document.createElement("canvas");
+    alternate.width = output.width;
+    alternate.height = output.height;
+    const alternateCtx = alternate.getContext("2d");
+    alternateCtx.fillStyle = "#fff";
+    alternateCtx.fillRect(0, 0, alternate.width, alternate.height);
+    alternateCtx.imageSmoothingEnabled = true;
+    alternateCtx.imageSmoothingQuality = "high";
+    alternateCtx.drawImage(canvas, x1, y1, cropWidth, cropHeight, 14, 12, alternate.width - 28, alternate.height - 24);
     crops.push({
       image: output.toDataURL("image/png"),
+      alternateImage: alternate.toDataURL("image/jpeg", 0.92),
       y: segment.start,
       inkPixels: inkPixels
     });
@@ -2029,6 +2051,10 @@ function cleanLocalOcrText(value) {
 
 function scannerExpandAbbreviations(value) {
   return String(value || "").toLowerCase()
+    .replace(/\bh\s*(?:[\/.\-]\s*|\s+)t\b/g, "hot tea")
+    .replace(/\bht\b/g, "hot tea")
+    .replace(/\bhot\s+t\b/g, "hot tea")
+    .replace(/\bh[2z][o0]\b/g, "water")
     .replace(/\b(chx|chk|chkn|chik|chick)\b/g, "chicken")
     .replace(/\bbf\b/g, "beef")
     .replace(/\b(shmp|shrm|shrp)\b/g, "shrimp")
@@ -2149,6 +2175,30 @@ function scannerHasStrongMenuEvidence(rawText, entry) {
   return closeMatches >= Math.max(1, Math.ceil(queryWords.length * 0.75));
 }
 
+function scannerOcrCandidateScore(rawText) {
+  const text = cleanLocalOcrText(rawText);
+  if (!text || text === "[unreadable handwriting]") return -1;
+  const codeIndex = scannerFindCodeEntry(scannerDetectCode(text));
+  if (codeIndex >= 0) return 3;
+  if (scannerOperationalAlias(text)) return 2;
+  const query = scannerWords(text).join(" ");
+  if (!query) return 0;
+  let best = 0;
+  scannerMenuFlat.forEach(function(entry) {
+    best = Math.max(best, scannerMenuSimilarity(text, entry));
+  });
+  return best;
+}
+
+async function scannerRecognizeCrop(recognizer, image) {
+  const output = await recognizer(image, {
+    max_new_tokens: 32,
+    num_beams: 4,
+    early_stopping: true
+  });
+  return Array.isArray(output) && output[0] ? output[0].generated_text : "";
+}
+
 function scannerDetectCode(rawText) {
   const text = String(rawText || "");
   let match = text.match(/\bL[\s.#-]*(1[0-8]|[1-9])\b/i);
@@ -2182,10 +2232,10 @@ function scannerReadQuantity(rawText) {
 }
 
 function scannerReadModifiers(rawText) {
-  const text = String(rawText || "");
+  const text = scannerExpandAbbreviations(rawText);
   let spice = null;
   if (/\b(?:ex|extra)\s*(?:spicy|hot)\b/i.test(text)) spice = "Ex Spicy";
-  else if (/\bspicy\b|\bhot\b/i.test(text)) spice = "Spicy";
+  else if (/\bspicy\b/i.test(text) || (/\bhot\b/i.test(text) && !/\bhot\s+tea\b/i.test(text))) spice = "Spicy";
   else if (/\bmedium\b|\bmed\b/i.test(text)) spice = "Medium";
   else if (/\bmild\b/i.test(text)) spice = "Mild";
   let rice = null;
@@ -2218,6 +2268,17 @@ function scannerFormatCandidate(entry) {
   return entry.category + " · " + entry.cleanName + " · $" + Number(entry.item.price).toFixed(2);
 }
 
+function scannerOperationalAlias(rawText) {
+  const withoutQuantity = String(rawText || "").replace(/^\s*(?:\d{1,2}\s*[x×]|[x×]\s*\d{1,2})\s*/i, "");
+  const phrase = scannerExpandAbbreviations(withoutQuantity)
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  if (/^plates?$/.test(phrase)) return "Paper Plates";
+  if (/^waters?$/.test(phrase)) return "Water";
+  if (/^hot\s+teas?$/.test(phrase)) return "Hot Tea";
+  return null;
+}
+
 function scannerMatchLocalLine(rawText, dayPart) {
   const quantity = scannerReadQuantity(rawText);
   const modifiers = scannerReadModifiers(rawText);
@@ -2239,10 +2300,7 @@ function scannerMatchLocalLine(rawText, dayPart) {
     };
   }
 
-  const simpleWords = scannerWords(rawText).join(" ");
-  let exactAlias = null;
-  if (/^plates?$/.test(simpleWords)) exactAlias = "Paper Plates";
-  else if (/^waters?$/.test(simpleWords)) exactAlias = "Water";
+  const exactAlias = scannerOperationalAlias(rawText);
   if (exactAlias) {
     const aliasEntry = scannerMenuFlat.find(function(entry) { return entry.cleanName === exactAlias; });
     if (aliasEntry) {
@@ -2342,14 +2400,28 @@ async function recognizeTicketLocally(dataUrl) {
   for (let i = 0; i < segmentation.crops.length; i++) {
     setScannerStatus("working", "Reading handwritten line " + (i + 1) + " of " + segmentation.crops.length + " on this device…");
     try {
-      const output = await recognizer(segmentation.crops[i].image, {
-        max_new_tokens: 32,
-        num_beams: 4,
-        early_stopping: true
-      });
-      const generated = Array.isArray(output) && output[0] ? output[0].generated_text : "";
       const yRatio = segmentation.height ? segmentation.crops[i].y / segmentation.height : 0;
-      const cleaned = scannerCleanFormText(generated, yRatio, segmentation.formMode);
+      const generated = await scannerRecognizeCrop(recognizer, segmentation.crops[i].image);
+      let cleaned = scannerCleanFormText(generated, yRatio, segmentation.formMode);
+      let score = scannerOcrCandidateScore(cleaned);
+      if (score < 0.86 && segmentation.crops[i].alternateImage) {
+        setScannerStatus("working", "Double-checking unclear line " + (i + 1) + " of " + segmentation.crops.length + "…");
+        try {
+          const alternateGenerated = await scannerRecognizeCrop(recognizer, segmentation.crops[i].alternateImage);
+          const alternateCleaned = scannerCleanFormText(alternateGenerated, yRatio, segmentation.formMode);
+          const alternateScore = scannerOcrCandidateScore(alternateCleaned);
+          if (alternateScore > score + 0.03) {
+            cleaned = alternateCleaned;
+            score = alternateScore;
+          }
+        } catch (alternateError) {
+          console.warn("Alternate local OCR pass could not read line", i + 1, alternateError);
+        }
+      }
+      // Do not present fluent-looking model guesses as transcriptions when
+      // neither pass has meaningful menu or code evidence. The source crop is
+      // still shown so staff can resolve it manually.
+      if (score < 0.52) cleaned = "";
       recognizedLines.push({
         text: cleaned || "[unreadable handwriting]",
         image: segmentation.crops[i].image,
@@ -2464,11 +2536,12 @@ function normalizeScannerResult(result) {
         needs_review: Boolean(item && item.needs_review) || ambiguous || confidence !== "high",
         _sourceImage: item && item.source_image ? String(item.source_image) : null,
         _menuIndex: -1,
+        _custom: Boolean(item && item.custom_item) || String(item && item.category || "").toLowerCase() === "custom",
         _selected: false
       };
-      normalizedItem._menuIndex = normalizedItem.ambiguous ? -1 : resolveScannerMenuIndex(normalizedItem);
-      normalizedItem._selected = normalizedItem._menuIndex >= 0 && !normalizedItem.needs_review;
-      if (normalizedItem._menuIndex < 0 && normalizedItem.matched_item) normalizedItem.needs_review = true;
+      normalizedItem._menuIndex = normalizedItem.ambiguous || normalizedItem._custom ? -1 : resolveScannerMenuIndex(normalizedItem);
+      normalizedItem._selected = (normalizedItem._menuIndex >= 0 || normalizedItem._custom) && !normalizedItem.needs_review;
+      if (normalizedItem._menuIndex < 0 && normalizedItem.matched_item && !normalizedItem._custom) normalizedItem.needs_review = true;
       return normalizedItem;
     }) : [],
     subtotal_estimate: Number.isFinite(Number(safe.subtotal_estimate)) ? Number(safe.subtotal_estimate) : 0,
@@ -2518,8 +2591,17 @@ function scannerEsc(value) {
     .replace(/'/g, "&#039;");
 }
 
-function scannerMenuOptions(selectedIndex) {
+function scannerCustomItemName(value) {
+  const name = cleanLocalOcrText(value)
+    .replace(/^\s*(?:\d{1,2}\s*[x×]|[x×]\s*\d{1,2})\s*/i, "")
+    .trim();
+  if (!name || /^\[(?:unreadable handwriting|illegible)\]$/i.test(name)) return "";
+  return name.slice(0, 80);
+}
+
+function scannerMenuOptions(selectedIndex, customSelected) {
   let options = '<option value="">— Needs menu match —</option>';
+  options += '<option value="custom"' + (customSelected ? " selected" : "") + '>— Use handwriting as a custom item —</option>';
   scannerMenuFlat.forEach(function(entry, index) {
     options += '<option value="' + index + '"' + (index === selectedIndex ? " selected" : "") + ">" +
       scannerEsc(entry.category + " · " + entry.cleanName + " · $" + Number(entry.item.price).toFixed(2)) +
@@ -2551,16 +2633,20 @@ function renderScannerResults() {
       const candidates = item.ambiguous_candidates.length
         ? '<div class="scanner-candidates"><strong>Possible matches:</strong> ' + scannerEsc(item.ambiguous_candidates.join(" · ")) + "</div>"
         : "";
+      const customPrice = item._custom
+        ? '<div><label class="scanner-mini-label">Custom price</label><input type="number" min="0" step="0.01" value="' + Number(item.price_each || 0).toFixed(2) + '" data-scanner-field="custom_price" data-index="' + index + '"></div>'
+        : "";
       return '<article class="scanner-item-card' + cardClass + '">' +
         '<div class="scanner-item-top">' +
-          '<input class="scanner-import-check" type="checkbox" data-scanner-select="' + index + '"' + (item._selected ? " checked" : "") + (item._menuIndex < 0 ? " disabled" : "") + ' aria-label="Include line ' + (index + 1) + ' in order">' +
+          '<input class="scanner-import-check" type="checkbox" data-scanner-select="' + index + '"' + (item._selected ? " checked" : "") + (item._menuIndex < 0 && !item._custom ? " disabled" : "") + ' aria-label="Include line ' + (index + 1) + ' in order">' +
           "<div><div class=\"scanner-item-number\">Ticket line " + (index + 1) + "</div><div class=\"scanner-raw-line\">" + scannerEsc(item.raw_text) + "</div></div>" +
           '<span class="scanner-badge ' + scannerEsc(item.confidence) + '">' + scannerEsc(item.confidence) + "</span>" +
         "</div>" +
         linePreview +
         '<div class="scanner-item-grid">' +
           '<div><label class="scanner-mini-label">Quantity</label><input type="number" min="1" max="99" value="' + item.quantity + '" data-scanner-field="quantity" data-index="' + index + '"></div>' +
-          '<div class="wide"><label class="scanner-mini-label">Confirmed menu item</label><select data-scanner-field="match" data-index="' + index + '">' + scannerMenuOptions(item._menuIndex) + "</select></div>" +
+          '<div class="wide"><label class="scanner-mini-label">Confirmed item</label><select data-scanner-field="match" data-index="' + index + '">' + scannerMenuOptions(item._menuIndex, item._custom) + "</select></div>" +
+          customPrice +
           '<div><label class="scanner-mini-label">Confidence</label><select data-scanner-field="confidence" data-index="' + index + '">' +
             '<option value="high"' + (item.confidence === "high" ? " selected" : "") + ">High</option>" +
             '<option value="medium"' + (item.confidence === "medium" ? " selected" : "") + ">Medium</option>" +
@@ -2633,10 +2719,18 @@ function updateScannerItem(index, field, value) {
     item.quantity = Math.max(1, parseInt(value, 10) || 1);
   } else if (field === "raw_text") {
     item.raw_text = String(value || "[illegible]");
+    if (item._custom) {
+      const customName = scannerCustomItemName(item.raw_text);
+      item.matched_item = customName || null;
+      item.needs_review = !customName;
+      if (!customName) item._selected = false;
+    }
   } else if (field === "confidence") {
     item.confidence = ["high", "medium", "low"].includes(value) ? value : "low";
-    item.needs_review = item.ambiguous || item.confidence !== "high" || item._menuIndex < 0;
+    item.needs_review = item.ambiguous || item.confidence !== "high" || (item._menuIndex < 0 && !item._custom);
     if (item.needs_review) item._selected = false;
+  } else if (field === "custom_price") {
+    if (item._custom) item.price_each = Math.max(0, Number(value) || 0);
   } else if (field === "spice_level") {
     item.modifiers.spice_level = value || null;
   } else if (field === "rice") {
@@ -2644,10 +2738,28 @@ function updateScannerItem(index, field, value) {
   } else if (field === "notes") {
     item.modifiers.notes = String(value || "").trim() || null;
   } else if (field === "match") {
+    if (value === "custom") {
+      const customName = scannerCustomItemName(item.raw_text);
+      item._menuIndex = -1;
+      item._custom = Boolean(customName);
+      item.matched_item = customName || null;
+      item.category = customName ? "Custom" : null;
+      item.price_each = customName ? Math.max(0, Number(item.price_each) || 0) : null;
+      item.ambiguous = false;
+      item.ambiguous_candidates = [];
+      item.confidence = customName ? "high" : "low";
+      item.needs_review = !customName;
+      item._selected = Boolean(customName);
+      if (!customName) setScannerStatus("error", "Edit the raw handwriting into a readable item name, then choose custom item again.");
+      recalculateScannerSubtotal(scannerResult);
+      renderScannerResults();
+      return;
+    }
     const menuIndex = value === "" ? -1 : Number(value);
     item._menuIndex = Number.isInteger(menuIndex) ? menuIndex : -1;
     if (item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex]) {
       const entry = scannerMenuFlat[item._menuIndex];
+      item._custom = false;
       item.matched_item = entry.cleanName;
       item.category = entry.category;
       item.price_each = Number(entry.item.price);
@@ -2657,6 +2769,7 @@ function updateScannerItem(index, field, value) {
       item.needs_review = false;
       item._selected = true;
     } else {
+      item._custom = false;
       item.matched_item = null;
       item.category = null;
       item.price_each = null;
@@ -2700,7 +2813,8 @@ function getCleanScannerResult() {
         ambiguous: item.ambiguous,
         ambiguous_candidates: item.ambiguous_candidates.slice(),
         confidence: item.confidence,
-        needs_review: item.needs_review
+        needs_review: item.needs_review,
+        custom_item: Boolean(item._custom)
       };
     }),
     subtotal_estimate: scannerResult.subtotal_estimate,
@@ -2741,16 +2855,25 @@ function downloadScannerJson() {
 function addScannedItemsToOrder() {
   if (!scannerResult) return;
   const selected = scannerResult.items.filter(function(item) {
-    return item._selected && item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex];
+    const confirmedMenuItem = item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex];
+    const confirmedCustomItem = item._custom && scannerCustomItemName(item.raw_text);
+    return item._selected && (confirmedMenuItem || confirmedCustomItem);
   });
   if (!selected.length) {
-    setScannerStatus("error", "Select at least one confirmed menu item before importing.");
+    setScannerStatus("error", "Select at least one confirmed menu or custom item before importing.");
     return;
   }
 
   let addedQuantity = 0;
   selected.forEach(function(scanItem) {
-    const source = scannerMenuFlat[scanItem._menuIndex];
+    const source = scanItem._custom ? {
+      category: "Custom",
+      item: {
+        name: scannerCustomItemName(scanItem.raw_text),
+        price: Math.max(0, Number(scanItem.price_each) || 0),
+        customItem: true
+      }
+    } : scannerMenuFlat[scanItem._menuIndex];
     const spice = scanItem.modifiers.spice_level;
     const rice = scanItem.modifiers.rice;
     const extraSpicyCharge = spice === "Ex Spicy" ? 1 : 0;
@@ -2762,7 +2885,8 @@ function addScannedItemsToOrder() {
       price: Number(source.item.price) + extraSpicyCharge + riceUpcharge,
       basePrice: Number(source.item.price),
       note: note,
-      scannedRawText: scanItem.raw_text
+      scannedRawText: scanItem.raw_text,
+      customItem: Boolean(scanItem._custom)
     });
     if (spice) {
       imported.spiceLevel = spice;

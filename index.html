@@ -536,13 +536,19 @@
   body.dark .split-controls button { background: #1f1f1f; border-color: #383838; color: #e0e0e0; }
 
   /* UNDO TOAST */
-  .undo-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120%); background: #1a1a1a; color: #fff; padding: 12px 16px 12px 20px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; z-index: 10000; transition: transform 0.25s cubic-bezier(.4,1.4,.6,1); max-width: 90vw; }
-  .undo-toast.show { transform: translateX(-50%) translateY(0); }
+  .undo-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(calc(100% + 40px)); background: #1a1a1a; color: #fff; padding: 12px 16px 12px 20px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; z-index: 10000; max-width: 90vw;
+    /* Hide by opacity and visibility as well as position. A transform alone
+       is not enough: the offset is a percentage of the toast's own height,
+       which on a tall two-line toast does not clear its bottom offset. */
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: transform 0.25s cubic-bezier(.4,1.4,.6,1), opacity 0.2s ease, visibility 0s linear 0.25s; }
+  .undo-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; visibility: visible; pointer-events: auto;
+    transition: transform 0.25s cubic-bezier(.4,1.4,.6,1), opacity 0.2s ease, visibility 0s linear 0s; }
   .undo-toast button { background: none; border: none; color: #2ddbbf; font-weight: 700; font-size: 15px; cursor: pointer; padding: 4px 12px; border-radius: 6px; font-family: inherit; }
   .undo-toast button:hover { background: rgba(45,219,191,0.12); }
   .undo-toast.info-toast { background: #15302a; }
   @media (max-width: 768px) {
-    .undo-toast { bottom: 96px; left: 16px; transform: translateY(120%); max-width: calc(100% - 32px); width: calc(100% - 32px); }
+    .undo-toast { bottom: 96px; left: 16px; transform: translateY(calc(100% + 120px)); max-width: calc(100% - 32px); width: calc(100% - 32px); }
     .undo-toast.show { transform: translateY(0); }
   }
 
@@ -5985,7 +5991,9 @@ function loadUnavailable() {
   } catch(e) {}
 }
 
-function showInfoToast(text) {
+let _infoToastTimer = null;
+
+function showInfoToast(text, duration) {
   let toast = document.getElementById('infoToast');
   if (!toast) {
     toast = document.createElement('div');
@@ -5993,9 +6001,19 @@ function showInfoToast(text) {
     toast.className = 'undo-toast info-toast';
     document.body.appendChild(toast);
   }
-  toast.innerHTML = `<span>${text}</span><button onclick="document.getElementById('infoToast').classList.remove('show')">Dismiss</button>`;
+  // Purely informational, so it just says its piece and goes. The Dismiss
+  // button was removed: with auto-hide working there is nothing to dismiss,
+  // and a button that must be tapped is one more thing between the cook and
+  // the order.
+  toast.innerHTML = `<span>${text}</span>`;
+  // Restart the clock on every message, so a second toast is not cut short
+  // by the timer belonging to the first.
+  if (_infoToastTimer) clearTimeout(_infoToastTimer);
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 6000);
+  _infoToastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    _infoToastTimer = null;
+  }, duration || 3500);
 }
 
 function toggleStockManager() {

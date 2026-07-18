@@ -2203,6 +2203,79 @@ async function scannerRecognizeCrop(recognizer, image) {
 }
 
 function scannerClassifyDinnerCodeMask(width, height, mask) {
+  // Remove isolated form fragments before measuring the # and numeral. Mobile
+  // Safari can resample the same crop differently from desktop browsers, and
+  // a few detached pixels used to enlarge the bounding box enough to break all
+  // of the ratio tests below.
+  const visited = new Uint8Array(mask.length);
+  const components = [];
+  for (let seed = 0; seed < mask.length; seed++) {
+    if (!mask[seed] || visited[seed]) continue;
+    const stack = [seed];
+    const points = [];
+    visited[seed] = 1;
+    let componentMinX = width;
+    let componentMaxX = -1;
+    let componentMinY = height;
+    let componentMaxY = -1;
+    while (stack.length) {
+      const point = stack.pop();
+      points.push(point);
+      const x = point % width;
+      const y = Math.floor(point / width);
+      componentMinX = Math.min(componentMinX, x);
+      componentMaxX = Math.max(componentMaxX, x);
+      componentMinY = Math.min(componentMinY, y);
+      componentMaxY = Math.max(componentMaxY, y);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nextX = x + dx;
+          const nextY = y + dy;
+          if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) continue;
+          const next = nextY * width + nextX;
+          if (!mask[next] || visited[next]) continue;
+          visited[next] = 1;
+          stack.push(next);
+        }
+      }
+    }
+    components.push({
+      points: points,
+      area: points.length,
+      minX: componentMinX,
+      maxX: componentMaxX,
+      minY: componentMinY,
+      maxY: componentMaxY
+    });
+  }
+  if (!components.length) return null;
+  const largestArea = components.reduce(function(largest, component) {
+    return Math.max(largest, component.area);
+  }, 0);
+  function isThinRuleFragment(component) {
+    const componentWidth = component.maxX - component.minX + 1;
+    const componentHeight = component.maxY - component.minY + 1;
+    return componentHeight <= Math.max(4, height * 0.02) && componentWidth > width * 0.08;
+  }
+  let majorComponents = components.filter(function(component) {
+    return component.area >= largestArea * 0.05 && !isThinRuleFragment(component);
+  });
+  if (!majorComponents.length) {
+    majorComponents = components.slice().sort(function(a, b) { return b.area - a.area; }).slice(0, 1);
+  }
+  const mainMinY = majorComponents.reduce(function(value, component) { return Math.min(value, component.minY); }, height);
+  const mainMaxY = majorComponents.reduce(function(value, component) { return Math.max(value, component.maxY); }, -1);
+  const mainHeight = Math.max(1, mainMaxY - mainMinY + 1);
+  const filteredMask = new Uint8Array(mask.length);
+  components.forEach(function(component) {
+    if (component.area < Math.max(8, largestArea * 0.015)) return;
+    if (isThinRuleFragment(component)) return;
+    if (component.maxY < mainMinY - mainHeight * 0.20 || component.minY > mainMaxY + mainHeight * 0.20) return;
+    component.points.forEach(function(point) { filteredMask[point] = 1; });
+  });
+  mask = filteredMask;
+
   let minX = width;
   let maxX = -1;
   let minY = height;
@@ -2250,26 +2323,27 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   // A handwritten # has two nearby tall strokes and two nearby wide strokes.
   // Detect that structure before attempting to classify the numeral to its
   // right, which avoids depending on general sentence handwriting OCR.
-  const verticalRuns = projectionRuns(columnInk, boxHeight * 0.32)
-    .filter(function(run) { return run.center > boxWidth * 0.05; });
+  const verticalRuns = projectionRuns(columnInk, boxHeight * 0.25)
+    .filter(function(run) { return run.center > boxWidth * 0.04; });
   let hashPair = null;
   verticalRuns.forEach(function(first, firstIndex) {
     verticalRuns.slice(firstIndex + 1).forEach(function(second) {
       const distance = second.center - first.center;
-      if (distance < boxHeight * 0.15 || distance > boxHeight * 0.65) return;
+      if (distance < boxHeight * 0.12 || distance > boxHeight * 0.52) return;
       if (second.center > boxWidth * 0.68) return;
       const score = Math.abs(distance / boxHeight - 0.34) + first.center / boxWidth * 0.08;
       if (!hashPair || score < hashPair.score) hashPair = { first: first, second: second, distance: distance, score: score };
     });
   });
   if (!hashPair) return null;
+  if (hashPair.score > 0.20) return null;
 
-  const horizontalRuns = projectionRuns(rowInk, boxWidth * 0.24);
+  const horizontalRuns = projectionRuns(rowInk, boxWidth * 0.18);
   let hasCrossbarPair = false;
   horizontalRuns.forEach(function(first, firstIndex) {
     horizontalRuns.slice(firstIndex + 1).forEach(function(second) {
       const distance = second.center - first.center;
-      if (distance >= boxHeight * 0.10 && distance <= boxHeight * 0.45) hasCrossbarPair = true;
+      if (distance >= boxHeight * 0.08 && distance <= boxHeight * 0.34) hasCrossbarPair = true;
     });
   });
   // A printed form rule can overlap and erase one horizontal # stroke during
@@ -2279,20 +2353,20 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
 
   const activeColumns = [];
   for (let x = 0; x < boxWidth; x++) if (columnInk[x]) activeColumns.push(x);
-  const searchAfter = hashPair.second.center + hashPair.distance * 0.20;
+  const searchAfter = hashPair.second.center + hashPair.distance * 0.15;
   let split = -1;
   for (let i = 0; i + 1 < activeColumns.length; i++) {
     const left = activeColumns[i];
     const right = activeColumns[i + 1];
     const gap = right - left - 1;
-    if (left <= searchAfter || gap < Math.max(2, Math.floor(boxHeight * 0.02))) continue;
+    if (left <= searchAfter || gap < Math.max(2, Math.floor(boxHeight * 0.015))) continue;
     // The first meaningful gap after the hash separates it from the numeral.
     // Choosing the largest gap can incorrectly split a handwritten 1 whose
     // top hook was separated by guest-check line removal.
     split = right;
     break;
   }
-  if (split < 0 || split >= boxWidth - 2) return null;
+  if (split < 0 || split >= boxWidth - 2) return "#?";
 
   let digitMinX = boxWidth;
   let digitMaxX = -1;
@@ -2307,10 +2381,10 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
       digitMaxY = Math.max(digitMaxY, y);
     }
   }
-  if (digitMaxX <= digitMinX || digitMaxY <= digitMinY) return null;
+  if (digitMaxX <= digitMinX || digitMaxY <= digitMinY) return "#?";
   const digitWidth = digitMaxX - digitMinX + 1;
   const digitHeight = digitMaxY - digitMinY + 1;
-  if (digitHeight < boxHeight * 0.45 || digitWidth < boxHeight * 0.18) return null;
+  if (digitHeight < boxHeight * 0.45 || digitWidth < boxHeight * 0.18) return "#?";
 
   let digitInk = 0;
   let bottomInk = 0;
@@ -2344,7 +2418,7 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
       }
     }
   }
-  if (digitInk < 35) return null;
+  if (digitInk < 35) return "#?";
   const ratio = digitWidth / digitHeight;
   const bottomShare = bottomInk / digitInk;
   const leftShare = leftInk / digitInk;
@@ -2358,7 +2432,7 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   if (hasCrossbarPair && bottomShare >= 0.38 && ratio >= 1.42 && leftShare < 0.28 && middleShare > 0.34) return "#2";
   if (ratio < 0.75 && rightShare > 0.50 && middleShare < 0.18 && bottomSpan > 0.72) return "#1";
   if (bottomShare >= 0.38 && ratio < 1.42 && bottomSpan > 0.72 && topSpan < 0.68) return "#1";
-  return null;
+  return "#?";
 }
 
 async function scannerDetectDinnerCodeFromCrop(dataUrl) {
@@ -2373,16 +2447,67 @@ async function scannerDetectDinnerCodeFromCrop(dataUrl) {
     const context = canvas.getContext("2d", { willReadFrequently: true });
     context.drawImage(image, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height).data;
-    const mask = new Uint8Array(width * height);
-    for (let point = 0, offset = 0; point < mask.length; point++, offset += 4) {
-      const luminance = pixels[offset] * 0.299 + pixels[offset + 1] * 0.587 + pixels[offset + 2] * 0.114;
-      if (luminance < 200) mask[point] = 1;
+    const luminance = new Uint8Array(width * height);
+    for (let point = 0, offset = 0; point < luminance.length; point++, offset += 4) {
+      luminance[point] = Math.round(pixels[offset] * 0.299 + pixels[offset + 1] * 0.587 + pixels[offset + 2] * 0.114);
     }
-    return scannerClassifyDinnerCodeMask(width, height, mask);
+    const votes = { "#1": 0, "#2": 0, "#3": 0 };
+    let hashVotes = 0;
+    [120, 150, 180, 205, 225].forEach(function(threshold) {
+      const mask = new Uint8Array(width * height);
+      for (let point = 0; point < mask.length; point++) {
+        if (luminance[point] < threshold) mask[point] = 1;
+      }
+      const result = scannerClassifyDinnerCodeMask(width, height, mask);
+      if (Object.prototype.hasOwnProperty.call(votes, result)) votes[result]++;
+      else if (result === "#?") hashVotes++;
+    });
+    const ranked = Object.keys(votes).sort(function(a, b) { return votes[b] - votes[a]; });
+    const best = ranked[0];
+    const bestVotes = votes[best];
+    const secondVotes = votes[ranked[1]];
+    if (bestVotes >= 2 && bestVotes > secondVotes) return best;
+    if (bestVotes === 1 && secondVotes === 0 && bestVotes + hashVotes >= 3) return best;
+    if (hashVotes >= 2 || bestVotes) return "#?";
+    return null;
   } catch (error) {
     console.warn("Short dinner-code detector could not inspect a line", error);
     return null;
   }
+}
+
+function scannerReconcileDinnerCodeHints(hints) {
+  const resolved = hints.slice();
+  let start = 0;
+  while (start < hints.length) {
+    if (!/^#(?:[1-8]|\?)$/.test(String(hints[start] || ""))) {
+      start++;
+      continue;
+    }
+    let end = start;
+    while (end + 1 < hints.length && /^#(?:[1-8]|\?)$/.test(String(hints[end + 1] || ""))) end++;
+    const runLength = end - start + 1;
+    if (runLength >= 2) {
+      const possibleStarts = [];
+      for (let firstNumber = 1; firstNumber + runLength - 1 <= 8; firstNumber++) {
+        let consistent = true;
+        for (let offset = 0; offset < runLength; offset++) {
+          const hint = hints[start + offset];
+          if (hint !== "#?" && hint !== "#" + (firstNumber + offset)) consistent = false;
+        }
+        if (consistent) possibleStarts.push(firstNumber);
+      }
+      // Only fill uncertain codes when at least one visual result anchors a
+      // unique consecutive sequence. This resolves a damaged # between #1 and
+      // #3 without guessing that every group must begin at one.
+      const hasAnchor = hints.slice(start, end + 1).some(function(hint) { return /^#[1-8]$/.test(String(hint)); });
+      if (hasAnchor && possibleStarts.length === 1) {
+        for (let offset = 0; offset < runLength; offset++) resolved[start + offset] = "#" + (possibleStarts[0] + offset);
+      }
+    }
+    start = end + 1;
+  }
+  return resolved;
 }
 
 function scannerDetectCode(rawText) {
@@ -2585,15 +2710,23 @@ function scannerMatchLocalLine(rawText, dayPart) {
 
 async function recognizeTicketLocally(dataUrl) {
   const segmentation = await segmentTicketIntoLines(dataUrl);
+  const visualHints = [];
+  if (segmentation.formMode) {
+    for (let i = 0; i < segmentation.crops.length; i++) {
+      setScannerStatus("working", "Checking short menu code " + (i + 1) + " of " + segmentation.crops.length + "…");
+      visualHints.push(await scannerDetectDinnerCodeFromCrop(segmentation.crops[i].image));
+    }
+  } else {
+    segmentation.crops.forEach(function() { visualHints.push(null); });
+  }
+  const visualDinnerCodes = scannerReconcileDinnerCodeHints(visualHints);
   const recognizer = await loadScannerOcrPipeline();
   const recognizedLines = [];
   for (let i = 0; i < segmentation.crops.length; i++) {
     setScannerStatus("working", "Reading handwritten line " + (i + 1) + " of " + segmentation.crops.length + " on this device…");
     try {
       const yRatio = segmentation.height ? segmentation.crops[i].y / segmentation.height : 0;
-      const visualDinnerCode = segmentation.formMode
-        ? await scannerDetectDinnerCodeFromCrop(segmentation.crops[i].image)
-        : null;
+      const visualDinnerCode = /^#[1-8]$/.test(String(visualDinnerCodes[i] || "")) ? visualDinnerCodes[i] : null;
       let cleaned = visualDinnerCode || "";
       let score = visualDinnerCode ? 3 : -1;
       if (!visualDinnerCode) {

@@ -665,6 +665,15 @@
   .scanner-working-line { display: flex; align-items: center; gap: 9px; }
   .scanner-spinner { width: 16px; height: 16px; border: 2px solid rgba(14,124,107,0.25); border-top-color: #0e7c6b; border-radius: 50%; animation: scannerSpin 0.75s linear infinite; flex: 0 0 auto; }
   @keyframes scannerSpin { to { transform: rotate(360deg); } }
+  .scanner-line-tools { display: flex; gap: 6px; margin: 6px 0 2px; }
+  .scanner-tool-btn { border: 1px solid #c9c2b6; border-radius: 8px; background: #fbfaf7; color: #555; font: 700 12px inherit; padding: 6px 10px; cursor: pointer; }
+  .scanner-tool-btn:active { transform: scale(0.97); }
+  .scanner-suggest-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
+  .scanner-suggest-chip { padding: 5px 10px; border: 1px solid #9accc3; border-radius: 14px; background: #f0faf7; color: #0e7c6b; font: 600 12px inherit; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scanner-suggest-chip:active { transform: scale(0.97); }
+  .scanner-clear-learned { width: 100%; margin-top: 10px; }
+  body.dark .scanner-tool-btn { background: #262626; border-color: #3a3a3a; color: #bbb; }
+  body.dark .scanner-suggest-chip { background: #10352f; border-color: #2b5e54; color: #7fdccb; }
   .scanner-empty-review { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #958e84; padding: 35px; }
   .scanner-empty-review .icon { font-size: 44px; margin-bottom: 12px; }
   .scanner-empty-review strong { color: #615b54; font-size: 17px; margin-bottom: 6px; }
@@ -1057,6 +1066,7 @@
             <span class="scanner-model-dot"></span>
             <span id="scannerModelStateText">Recognition model loads when the first ticket is analyzed.</span>
           </div>
+          <button class="scanner-button neutral scanner-clear-learned" onclick="clearScannerCorrections()" title="Forget the handwriting corrections learned on this device">Clear Learned Corrections</button>
         </div>
         <button class="scanner-button primary scanner-analyze" id="analyzeTicketBtn" onclick="analyzeTicket()" disabled>Read Ticket Locally</button>
         <div class="scanner-status" id="scannerStatus" role="status" aria-live="polite"></div>
@@ -1788,6 +1798,107 @@ function scannerDetectPaperBounds(image) {
   return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
 }
 
+// The most recent full-page preparation is kept so the review panel can
+// re-crop or rescan a single line without reprocessing the whole photo.
+let scannerLastPrep = null;
+
+function scannerEstimateSkew(canvas) {
+  // Estimate a small rotation by finding the angle whose row projection of
+  // dark pixels is sharpest. Runs on a small sample so it stays iPhone-fast.
+  const sampleWidth = 360;
+  const sampleScale = Math.min(1, sampleWidth / canvas.width);
+  const w = Math.max(40, Math.round(canvas.width * sampleScale));
+  const h = Math.max(40, Math.round(canvas.height * sampleScale));
+  const sample = document.createElement("canvas");
+  sample.width = w;
+  sample.height = h;
+  const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
+  sampleCtx.drawImage(canvas, 0, 0, w, h);
+  const data = sampleCtx.getImageData(0, 0, w, h).data;
+  const gray = new Uint8Array(w * h);
+  const hist = new Uint32Array(256);
+  for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+    const v = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+    gray[p] = v;
+    hist[v]++;
+  }
+  const threshold = scannerOtsuThreshold(hist, gray.length);
+  const dark = [];
+  for (let y = 0; y < h; y++) {
+    const off = y * w;
+    for (let x = 0; x < w; x++) if (gray[off + x] < threshold) dark.push(x, y);
+  }
+  sample.width = sample.height = 0;
+  if (dark.length < 800) return 0;
+  const cx = w / 2;
+  const cy = h / 2;
+  function projectionSharpness(angleDeg) {
+    const rad = angleDeg * Math.PI / 180;
+    const sin = Math.sin(rad);
+    const cos = Math.cos(rad);
+    const rows = new Float64Array(h + 4);
+    let total = 0;
+    for (let i = 0; i < dark.length; i += 2) {
+      const x = dark[i] - cx;
+      const y = dark[i + 1] - cy;
+      const ry = Math.round(x * sin + y * cos + cy);
+      if (ry >= 0 && ry < rows.length) { rows[ry]++; total++; }
+    }
+    if (!total) return 0;
+    const mean = total / rows.length;
+    let variance = 0;
+    for (let r = 0; r < rows.length; r++) { const d = rows[r] - mean; variance += d * d; }
+    return variance;
+  }
+  let best = 0;
+  let bestVariance = -1;
+  for (let deg = -6; deg <= 6; deg += 1) {
+    const v = projectionSharpness(deg);
+    if (v > bestVariance) { bestVariance = v; best = deg; }
+  }
+  for (let deg = best - 0.75; deg <= best + 0.75; deg += 0.25) {
+    const v = projectionSharpness(deg);
+    if (v > bestVariance) { bestVariance = v; best = deg; }
+  }
+  // Only correct clear tilts; sub-half-degree "corrections" add resampling blur.
+  return Math.abs(best) >= 0.5 && Math.abs(best) <= 6 ? best : 0;
+}
+
+function scannerRenderCropFromSources(cleanedSource, originalSource, rect, padLevel, width, height) {
+  // Generous padding preserves tall strokes, hash marks, and descenders. The
+  // pad level grows when the reviewer taps "Expand crop".
+  const level = Math.max(1, Math.min(4, padLevel || 1));
+  const baseHeight = Math.max(1, rect.y2 - rect.y1 + 1);
+  const yPad = Math.round(Math.max(10, baseHeight * 0.5) * level);
+  const xPad = Math.round(Math.max(14, baseHeight * 0.6) * level);
+  const y1 = Math.max(0, rect.y1 - yPad);
+  const y2 = Math.min(height - 1, rect.y2 + yPad);
+  const x1 = Math.max(0, rect.x1 - xPad);
+  const x2 = Math.min(width - 1, rect.x2 + xPad);
+  const cropWidth = x2 - x1 + 1;
+  const cropHeight = y2 - y1 + 1;
+  const targetHeight = 96;
+  const lineScale = Math.max(1, Math.min(3, targetHeight / cropHeight));
+  function draw(source, mime, quality) {
+    const output = document.createElement("canvas");
+    output.width = Math.min(2200, Math.max(120, Math.round(cropWidth * lineScale) + 28));
+    output.height = Math.max(112, Math.round(cropHeight * lineScale) + 24);
+    const outputCtx = output.getContext("2d");
+    outputCtx.fillStyle = "#fff";
+    outputCtx.fillRect(0, 0, output.width, output.height);
+    outputCtx.imageSmoothingEnabled = true;
+    outputCtx.imageSmoothingQuality = "high";
+    outputCtx.drawImage(source, x1, y1, cropWidth, cropHeight, 14, 12, output.width - 28, output.height - 24);
+    const url = output.toDataURL(mime, quality);
+    output.width = output.height = 0;
+    return url;
+  }
+  return {
+    image: draw(cleanedSource, "image/png"),
+    alternateImage: draw(originalSource, "image/jpeg", 0.92)
+  };
+}
+
 async function segmentTicketIntoLines(dataUrl) {
   const image = await loadScannerImage(dataUrl);
   const paper = scannerDetectPaperBounds(image);
@@ -1795,13 +1906,33 @@ async function segmentTicketIntoLines(dataUrl) {
   const scale = Math.min(1, maxWidth / paper.width);
   const width = Math.max(1, Math.round(paper.width * scale));
   const height = Math.max(1, Math.round(paper.height * scale));
-  const canvas = document.createElement("canvas");
+  let canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  let ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(image, paper.x, paper.y, paper.width, paper.height, 0, 0, width, height);
+
+  // Correct a slightly rotated ticket so handwriting rows stay separable and
+  // printed rules line up with raster rows for cleaner removal.
+  const skew = scannerEstimateSkew(canvas);
+  if (skew) {
+    const rotated = document.createElement("canvas");
+    rotated.width = width;
+    rotated.height = height;
+    const rotatedCtx = rotated.getContext("2d", { willReadFrequently: true });
+    rotatedCtx.fillStyle = "#fff";
+    rotatedCtx.fillRect(0, 0, width, height);
+    rotatedCtx.translate(width / 2, height / 2);
+    rotatedCtx.rotate(skew * Math.PI / 180);
+    rotatedCtx.drawImage(canvas, -width / 2, -height / 2);
+    rotatedCtx.setTransform(1, 0, 0, 1, 0, 0);
+    canvas.width = canvas.height = 0;
+    canvas = rotated;
+    ctx = rotatedCtx;
+  }
+
   const pixels = ctx.getImageData(0, 0, width, height);
   const gray = new Uint8Array(width * height);
   const histogram = new Uint32Array(256);
@@ -1811,131 +1942,147 @@ async function segmentTicketIntoLines(dataUrl) {
     histogram[value]++;
   }
   const threshold = scannerOtsuThreshold(histogram, gray.length);
-  const edgeMargin = Math.max(2, Math.round(width * 0.02));
-  const rawRowInk = new Uint32Array(height);
+  const dark = new Uint8Array(width * height);
+  for (let p = 0; p < dark.length; p++) if (gray[p] < threshold) dark[p] = 1;
+
+  // ── Printed-rule detection by dark-run length + stroke thickness ──
+  // A printed guest-check rule is a LONG and THIN dark run. Handwriting that
+  // crosses a rule is thicker at that column, so it is kept, not erased.
+  const rulePixel = new Uint8Array(width * height);
+  const minHorizontalRun = Math.max(40, Math.round(width * 0.18));
+  const maxRuleThickness = Math.max(3, Math.round(height * 0.006));
   for (let y = 0; y < height; y++) {
-    let count = 0;
     const offset = y * width;
-    for (let x = edgeMargin; x < width - edgeMargin; x++) {
-      if (gray[offset + x] < threshold) count++;
+    let runStart = -1;
+    for (let x = 0; x <= width; x++) {
+      const isDark = x < width && dark[offset + x];
+      if (isDark && runStart < 0) runStart = x;
+      if (!isDark && runStart >= 0) {
+        if (x - runStart >= minHorizontalRun) {
+          for (let rx = runStart; rx < x; rx++) {
+            let up = 0;
+            while (up < maxRuleThickness + 6 && y - up - 1 >= 0 && dark[(y - up - 1) * width + rx]) up++;
+            let down = 0;
+            while (down < maxRuleThickness + 6 && y + down + 1 < height && dark[(y + down + 1) * width + rx]) down++;
+            if (up + down + 1 <= maxRuleThickness + 2) rulePixel[offset + rx] = 1;
+          }
+        }
+        runStart = -1;
+      }
     }
-    rawRowInk[y] = count;
+  }
+  const minVerticalRun = Math.max(40, Math.round(height * 0.12));
+  const maxColumnThickness = Math.max(3, Math.round(width * 0.006));
+  for (let x = 0; x < width; x++) {
+    let runStart = -1;
+    for (let y = 0; y <= height; y++) {
+      const isDark = y < height && dark[y * width + x];
+      if (isDark && runStart < 0) runStart = y;
+      if (!isDark && runStart >= 0) {
+        if (y - runStart >= minVerticalRun) {
+          for (let ry = runStart; ry < y; ry++) {
+            const offset = ry * width;
+            let left = 0;
+            while (left < maxColumnThickness + 6 && x - left - 1 >= 0 && dark[offset + x - left - 1]) left++;
+            let right = 0;
+            while (right < maxColumnThickness + 6 && x + right + 1 < width && dark[offset + x + right + 1]) right++;
+            if (left + right + 1 <= maxColumnThickness + 2) rulePixel[offset + x] = 1;
+          }
+        }
+        runStart = -1;
+      }
+    }
   }
 
-  // Guest-check forms have long horizontal and vertical rules. Detect those
-  // separately so they do not become dozens of fake handwriting lines.
+  // Row-level rule map: which raster rows are dominated by printed rules.
   const ruleRows = new Uint8Array(height);
-  const strongRuleRows = new Uint8Array(height);
-  // Allow for a slightly tilted ticket: a sloped rule occupies only part of
-  // one raster row, so 20% is a better form-line signal than 30%.
-  const ruleRowThreshold = Math.max(30, Math.round(width * 0.20));
-  for (let y = 0; y < height; y++) {
-    if (rawRowInk[y] >= ruleRowThreshold) strongRuleRows[y] = 1;
-  }
+  const ruleRowThreshold = Math.max(30, Math.round(width * 0.15));
   let ruleCount = 0;
   let insideRule = false;
   for (let y = 0; y < height; y++) {
-    if (strongRuleRows[y] && !insideRule) ruleCount++;
-    insideRule = Boolean(strongRuleRows[y]);
+    let count = 0;
+    const offset = y * width;
+    for (let x = 0; x < width; x++) if (rulePixel[offset + x]) count++;
+    const strong = count >= ruleRowThreshold;
+    if (strong) ruleRows[y] = 1;
+    if (strong && !insideRule) ruleCount++;
+    insideRule = strong;
   }
   const formMode = ruleCount >= 5;
-  const rulePadding = Math.max(1, Math.round(width * 0.002));
   if (formMode) {
+    const rulePadding = Math.max(1, Math.round(width * 0.002));
+    const padded = new Uint8Array(height);
     for (let y = 0; y < height; y++) {
-      if (!strongRuleRows[y]) continue;
-      for (let fill = Math.max(0, y - rulePadding); fill <= Math.min(height - 1, y + rulePadding); fill++) {
-        ruleRows[fill] = 1;
-      }
+      if (!ruleRows[y]) continue;
+      for (let fill = Math.max(0, y - rulePadding); fill <= Math.min(height - 1, y + rulePadding); fill++) padded[fill] = 1;
     }
+    padded.forEach(function(value, index) { if (value) ruleRows[index] = 1; });
   }
 
-  const ruleColumns = new Uint8Array(width);
-  if (formMode) {
-    const columnInk = new Uint32Array(width);
-    for (let y = 0; y < height; y++) {
-      if (ruleRows[y]) continue;
-      const offset = y * width;
-      for (let x = edgeMargin; x < width - edgeMargin; x++) {
-        if (gray[offset + x] < threshold) columnInk[x]++;
-      }
+  // ── Cleaned handwriting mask: dark ink minus printed rules ──
+  // Where a stroke was erased by a rule, restore it when real (non-rule) ink
+  // continues above AND below within a small bridge. This is the "compare the
+  // cleaned image with the original" restore pass.
+  const ink = new Uint8Array(width * height);
+  const maximumBridge = Math.max(8, Math.round(height * 0.012));
+  for (let p = 0; p < dark.length; p++) {
+    if (!dark[p]) continue;
+    if (!rulePixel[p]) { ink[p] = 1; continue; }
+    let hasAbove = false;
+    for (let step = 1; step <= maximumBridge; step++) {
+      const q = p - step * width;
+      if (q < 0) break;
+      if (dark[q] && !rulePixel[q]) { hasAbove = true; break; }
     }
-    const ruleColumnThreshold = Math.max(40, Math.round(height * 0.16));
-    const columnPadding = Math.max(1, Math.round(width * 0.002));
-    for (let x = edgeMargin; x < width - edgeMargin; x++) {
-      if (columnInk[x] < ruleColumnThreshold) continue;
-      for (let fill = Math.max(0, x - columnPadding); fill <= Math.min(width - 1, x + columnPadding); fill++) {
-        ruleColumns[fill] = 1;
-      }
+    if (!hasAbove) continue;
+    for (let step = 1; step <= maximumBridge; step++) {
+      const q = p + step * width;
+      if (q >= dark.length) break;
+      if (dark[q] && !rulePixel[q]) { ink[p] = 1; break; }
     }
   }
 
   const cleanedCanvas = document.createElement("canvas");
   cleanedCanvas.width = width;
   cleanedCanvas.height = height;
-  const cleanedCtx = cleanedCanvas.getContext("2d");
+  const cleanedCtx = cleanedCanvas.getContext("2d", { willReadFrequently: true });
   const cleanedPixels = cleanedCtx.createImageData(width, height);
-  cleanedPixels.data.set(pixels.data);
   if (formMode) {
     // TrOCR performs much more reliably on clean black writing over white.
-    // Rebuild the image from the dark ink mask instead of feeding it shadows,
-    // paper color, form printing, and tabletop texture.
     for (let offset = 0; offset < cleanedPixels.data.length; offset += 4) {
       cleanedPixels.data[offset] = 255;
       cleanedPixels.data[offset + 1] = 255;
       cleanedPixels.data[offset + 2] = 255;
       cleanedPixels.data[offset + 3] = 255;
     }
-    const nearestAbove = new Int32Array(height);
-    const nearestBelow = new Int32Array(height);
-    let nearest = -1;
-    for (let y = 0; y < height; y++) {
-      if (!ruleRows[y]) nearest = y;
-      nearestAbove[y] = nearest;
+    for (let p = 0; p < ink.length; p++) {
+      if (!ink[p]) continue;
+      const offset = p * 4;
+      cleanedPixels.data[offset] = 0;
+      cleanedPixels.data[offset + 1] = 0;
+      cleanedPixels.data[offset + 2] = 0;
     }
-    nearest = -1;
-    for (let y = height - 1; y >= 0; y--) {
-      if (!ruleRows[y]) nearest = y;
-      nearestBelow[y] = nearest;
-    }
-    const maximumBridge = Math.max(8, Math.round(height * 0.012));
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (ruleColumns[x]) continue;
-        const point = y * width + x;
-        let keepInk = !ruleRows[y] && gray[point] < threshold;
-        if (ruleRows[y]) {
-          const above = nearestAbove[y];
-          const below = nearestBelow[y];
-          if (above >= 0 && below >= 0 && below - above <= maximumBridge &&
-              gray[above * width + x] < threshold && gray[below * width + x] < threshold) {
-            keepInk = true;
-          }
-        }
-        if (!keepInk) continue;
-        const offset = point * 4;
-        cleanedPixels.data[offset] = 0;
-        cleanedPixels.data[offset + 1] = 0;
-        cleanedPixels.data[offset + 2] = 0;
-      }
-    }
+  } else {
+    cleanedPixels.data.set(pixels.data);
   }
   cleanedCtx.putImageData(cleanedPixels, 0, 0);
 
   // On this guest-check layout, handwriting belongs in the main order column.
-  // Excluding the left border and Tax/Total columns removes the last vertical
-  // rules and printed footer labels without touching the order writing.
+  // Excluding the left border and Tax/Total columns removes printed footer
+  // labels without touching the order writing. Padding may still extend a crop
+  // slightly outside this window so edge strokes are not clipped.
+  const edgeMargin = Math.max(2, Math.round(width * 0.02));
   const scanXStart = formMode ? Math.max(edgeMargin, Math.round(width * 0.18)) : edgeMargin;
   const scanXEnd = formMode ? Math.min(width - edgeMargin, Math.round(width * 0.64)) : width - edgeMargin;
   const scanYStart = formMode ? Math.round(height * 0.22) : 0;
   const scanYEnd = formMode ? Math.round(height * 0.87) : height;
+
   const rowInk = new Uint32Array(height);
   for (let y = scanYStart; y < scanYEnd; y++) {
-    if (ruleRows[y]) continue;
+    if (ruleRows[y] && formMode) continue;
     const offset = y * width;
     let count = 0;
-    for (let x = scanXStart; x < scanXEnd; x++) {
-      if (!ruleColumns[x] && gray[offset + x] < threshold) count++;
-    }
+    for (let x = scanXStart; x < scanXEnd; x++) if (ink[offset + x]) count++;
     rowInk[y] = count;
   }
 
@@ -1959,7 +2106,7 @@ async function segmentTicketIntoLines(dataUrl) {
     }
   }
 
-  const segments = [];
+  let segments = [];
   let start = -1;
   for (let y = 0; y <= height; y++) {
     const on = y < height && active[y];
@@ -1974,66 +2121,135 @@ async function segmentTicketIntoLines(dataUrl) {
     }
   }
 
-  const crops = [];
-  const maximumSegments = formMode ? 12 : 30;
-  segments.slice(0, maximumSegments).forEach(function(segment) {
-    // Give short symbols and tall handwritten strokes extra breathing room.
-    // This prevents the top of a numeral or the lower stroke of a # from being
-    // clipped when it sits close to a printed guest-check rule.
-    const yPad = Math.max(8, Math.round((segment.end - segment.start + 1) * 0.45));
-    const y1 = Math.max(0, segment.start - yPad);
-    const y2 = Math.min(height - 1, segment.end + yPad);
-    let x1 = width - 1;
-    let x2 = 0;
-    let inkPixels = 0;
-    for (let y = segment.start; y <= segment.end; y++) {
-      if (ruleRows[y]) continue;
-      const offset = y * width;
-      for (let x = scanXStart; x < scanXEnd; x++) {
-        if (!ruleColumns[x] && gray[offset + x] < threshold) {
-          x1 = Math.min(x1, x);
-          x2 = Math.max(x2, x);
-          inkPixels++;
+  // ── Connected components inside the scan window ──
+  // Components confirm each segment holds real writing (not dust or printed
+  // fragments), recover descenders/ascenders for tighter rects, and merge
+  // pieces of one handwritten line that projection split apart.
+  const components = [];
+  const visited = new Uint8Array(width * height);
+  const stack = new Int32Array(Math.max(1024, Math.round(width * height * 0.05)));
+  for (let sy = scanYStart; sy < scanYEnd; sy++) {
+    const rowOffset = sy * width;
+    for (let sx = scanXStart; sx < scanXEnd; sx++) {
+      const seed = rowOffset + sx;
+      if (!ink[seed] || visited[seed]) continue;
+      let stackSize = 0;
+      stack[stackSize++] = seed;
+      visited[seed] = 1;
+      let area = 0;
+      let minX = width, maxX = 0, minY = height, maxY = 0;
+      while (stackSize) {
+        const point = stack[--stackSize];
+        const x = point % width;
+        const y = Math.floor(point / width);
+        area++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < scanXStart || nx >= scanXEnd || ny < scanYStart || ny >= scanYEnd) continue;
+            const next = ny * width + nx;
+            if (!ink[next] || visited[next]) continue;
+            visited[next] = 1;
+            if (stackSize < stack.length) stack[stackSize++] = next;
+          }
         }
       }
+      components.push({ area: area, minX: minX, maxX: maxX, minY: minY, maxY: maxY });
     }
+  }
+
+  // Merge segments that share one handwritten component (a tall stroke or
+  // descender crossing the projection gap), without merging via page-height
+  // artifacts.
+  if (segments.length > 1 && components.length) {
+    const averageSegmentHeight = segments.reduce(function(sum, segment) { return sum + (segment.end - segment.start + 1); }, 0) / segments.length;
+    const parent = segments.map(function(_, index) { return index; });
+    function findRoot(index) {
+      while (parent[index] !== index) { parent[index] = parent[parent[index]]; index = parent[index]; }
+      return index;
+    }
+    components.forEach(function(component) {
+      const componentHeight = component.maxY - component.minY + 1;
+      if (componentHeight > averageSegmentHeight * 2.2) return;
+      const touched = [];
+      segments.forEach(function(segment, index) {
+        if (component.minY <= segment.end && component.maxY >= segment.start) touched.push(index);
+      });
+      for (let i = 1; i < touched.length; i++) {
+        const a = findRoot(touched[0]);
+        const b = findRoot(touched[i]);
+        if (a !== b) parent[b] = a;
+      }
+    });
+    const merged = {};
+    segments.forEach(function(segment, index) {
+      const root = findRoot(index);
+      if (!merged[root]) merged[root] = { start: segment.start, end: segment.end };
+      else {
+        merged[root].start = Math.min(merged[root].start, segment.start);
+        merged[root].end = Math.max(merged[root].end, segment.end);
+      }
+    });
+    segments = Object.keys(merged).map(function(key) { return merged[key]; })
+      .sort(function(a, b) { return a.start - b.start; });
+  }
+
+  const crops = [];
+  const maximumSegments = formMode ? 12 : 30;
+  const dustArea = Math.max(25, Math.round(Math.pow(height * 0.006, 2)));
+  segments.slice(0, maximumSegments).forEach(function(segment) {
+    const segmentComponents = components.filter(function(component) {
+      const overlap = Math.min(component.maxY, segment.end) - Math.max(component.minY, segment.start) + 1;
+      return overlap > 0 && overlap >= (component.maxY - component.minY + 1) * 0.4;
+    });
+    if (!segmentComponents.length) return;
+    let inkPixels = 0;
+    let largestComponent = 0;
+    let x1 = width - 1, x2 = 0, y1 = segment.start, y2 = segment.end;
+    segmentComponents.forEach(function(component) {
+      inkPixels += component.area;
+      largestComponent = Math.max(largestComponent, component.area);
+      x1 = Math.min(x1, component.minX);
+      x2 = Math.max(x2, component.maxX);
+      y1 = Math.min(y1, component.minY);
+      y2 = Math.max(y2, component.maxY);
+    });
+    // Do not create OCR entries from dust, stray form fragments, or an empty
+    // projection band that only bridged across a rule.
     if (!inkPixels || x2 <= x1) return;
-    const xPad = Math.max(12, Math.round((y2 - y1 + 1) * 0.55));
-    x1 = Math.max(formMode ? scanXStart : 0, x1 - xPad);
-    x2 = Math.min(formMode ? scanXEnd - 1 : width - 1, x2 + xPad);
-    const cropWidth = x2 - x1 + 1;
-    const cropHeight = y2 - y1 + 1;
-    const targetHeight = 96;
-    const lineScale = Math.max(1, Math.min(3, targetHeight / cropHeight));
-    const output = document.createElement("canvas");
-    output.width = Math.min(2200, Math.max(120, Math.round(cropWidth * lineScale) + 28));
-    output.height = Math.max(112, Math.round(cropHeight * lineScale) + 24);
-    const outputCtx = output.getContext("2d");
-    outputCtx.fillStyle = "#fff";
-    outputCtx.fillRect(0, 0, output.width, output.height);
-    outputCtx.imageSmoothingEnabled = true;
-    outputCtx.imageSmoothingQuality = "high";
-    outputCtx.drawImage(cleanedCanvas, x1, y1, cropWidth, cropHeight, 14, 12, output.width - 28, output.height - 24);
-    const alternate = document.createElement("canvas");
-    alternate.width = output.width;
-    alternate.height = output.height;
-    const alternateCtx = alternate.getContext("2d");
-    alternateCtx.fillStyle = "#fff";
-    alternateCtx.fillRect(0, 0, alternate.width, alternate.height);
-    alternateCtx.imageSmoothingEnabled = true;
-    alternateCtx.imageSmoothingQuality = "high";
-    alternateCtx.drawImage(canvas, x1, y1, cropWidth, cropHeight, 14, 12, alternate.width - 28, alternate.height - 24);
+    if (largestComponent < dustArea) return;
+    if (inkPixels < (formMode ? 60 : 30)) return;
+    const rect = { x1: x1, y1: y1, x2: x2, y2: y2 };
+    const rendered = scannerRenderCropFromSources(cleanedCanvas, canvas, rect, 1, width, height);
     crops.push({
-      image: output.toDataURL("image/png"),
-      alternateImage: alternate.toDataURL("image/jpeg", 0.92),
+      image: rendered.image,
+      alternateImage: rendered.alternateImage,
       y: segment.start,
-      inkPixels: inkPixels
+      inkPixels: inkPixels,
+      rect: rect
     });
   });
 
   if (!crops.length && !formMode) {
-    crops.push({ image: cleanedCanvas.toDataURL("image/png"), y: 0, inkPixels: 1 });
+    crops.push({ image: cleanedCanvas.toDataURL("image/png"), y: 0, inkPixels: 1, rect: { x1: 0, y1: 0, x2: width - 1, y2: height - 1 } });
   }
+
+  scannerLastPrep = {
+    cleanedUrl: cleanedCanvas.toDataURL("image/png"),
+    originalUrl: canvas.toDataURL("image/jpeg", 0.9),
+    width: width,
+    height: height,
+    formMode: formMode
+  };
+  cleanedCanvas.width = cleanedCanvas.height = 0;
+  canvas.width = canvas.height = 0;
+
   return {
     crops: crops,
     truncated: segments.length > maximumSegments,
@@ -2202,6 +2418,195 @@ async function scannerRecognizeCrop(recognizer, image) {
   return Array.isArray(output) && output[0] ? output[0].generated_text : "";
 }
 
+async function scannerVariantDataUrl(sourceUrl, kind) {
+  // Build a contrast-stretched or adaptively thresholded copy of a line crop.
+  // These give the OCR ensemble different looks at faint or uneven strokes.
+  const image = await loadScannerImage(sourceUrl);
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const gray = new Uint16Array(width * height);
+  for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+    gray[p] = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+  }
+  if (kind === "contrast") {
+    const histogram = new Uint32Array(256);
+    for (let p = 0; p < gray.length; p++) histogram[gray[p]]++;
+    const total = gray.length;
+    let low = 0, high = 255, cumulative = 0;
+    for (let v = 0; v < 256; v++) { cumulative += histogram[v]; if (cumulative >= total * 0.05) { low = v; break; } }
+    cumulative = 0;
+    for (let v = 255; v >= 0; v--) { cumulative += histogram[v]; if (cumulative >= total * 0.05) { high = v; break; } }
+    const range = Math.max(1, high - low);
+    for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+      const value = Math.max(0, Math.min(255, Math.round((gray[p] - low) * 255 / range)));
+      data[i] = data[i + 1] = data[i + 2] = value;
+    }
+  } else {
+    // Adaptive threshold via an integral image (local mean comparison).
+    const integral = new Float64Array((width + 1) * (height + 1));
+    for (let y = 0; y < height; y++) {
+      let rowSum = 0;
+      for (let x = 0; x < width; x++) {
+        rowSum += gray[y * width + x];
+        integral[(y + 1) * (width + 1) + (x + 1)] = integral[y * (width + 1) + (x + 1)] + rowSum;
+      }
+    }
+    const window = Math.max(15, Math.round(height / 3)) | 1;
+    const half = Math.floor(window / 2);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const x1 = Math.max(0, x - half), x2 = Math.min(width - 1, x + half);
+        const y1 = Math.max(0, y - half), y2 = Math.min(height - 1, y + half);
+        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+        const sum = integral[(y2 + 1) * (width + 1) + (x2 + 1)] - integral[y1 * (width + 1) + (x2 + 1)] -
+          integral[(y2 + 1) * (width + 1) + x1] + integral[y1 * (width + 1) + x1];
+        const on = gray[y * width + x] < (sum / count) * 0.88;
+        const i = (y * width + x) * 4;
+        const value = on ? 0 : 255;
+        data[i] = data[i + 1] = data[i + 2] = value;
+      }
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  const url = canvas.toDataURL("image/png");
+  canvas.width = canvas.height = 0;
+  return url;
+}
+
+async function scannerEnsembleRecognizeLine(recognizer, crop, yRatio, formMode, onPass) {
+  // Multi-pass OCR: cleaned crop, original crop, and (only when the first two
+  // are weak) contrast-enhanced and adaptive-threshold variants. Candidates
+  // are ranked by menu/alias/code evidence, cross-pass agreement, and any
+  // corrections previously learned on this device.
+  const candidates = [];
+  let best = null;
+  function noteCandidate(rawGenerated, source) {
+    const cleaned = scannerCleanFormText(rawGenerated, yRatio, formMode);
+    const key = scannerWords(cleaned).join(" ");
+    let entry = key ? candidates.find(function(candidate) { return candidate.key === key; }) : null;
+    if (entry) {
+      entry.agree++;
+      entry.score += 0.2; // independent passes agreeing is strong evidence
+    } else {
+      entry = {
+        text: cleaned,
+        key: key,
+        score: scannerOcrCandidateScore(cleaned) + scannerLearnedKeyBoost(key),
+        agree: 1,
+        source: source
+      };
+      candidates.push(entry);
+    }
+    if (!best || entry.score > best.score) best = entry;
+    return entry;
+  }
+  async function runPass(url, tag) {
+    if (!url) return;
+    if (onPass) onPass(tag);
+    try {
+      noteCandidate(await scannerRecognizeCrop(recognizer, url), tag);
+    } catch (error) {
+      console.warn("OCR pass '" + tag + "' failed for one line", error);
+    }
+  }
+  await runPass(crop.image, "cleaned");
+  if (!best || best.score < 1.5) await runPass(crop.alternateImage, "original");
+  if ((!best || best.score < 0.86) && crop.alternateImage) {
+    try { await runPass(await scannerVariantDataUrl(crop.alternateImage, "contrast"), "contrast"); } catch (error) { console.warn(error); }
+  }
+  if ((!best || best.score < 0.70) && crop.alternateImage) {
+    try { await runPass(await scannerVariantDataUrl(crop.alternateImage, "adaptive"), "adaptive"); } catch (error) { console.warn(error); }
+  }
+  candidates.sort(function(a, b) { return b.score - a.score; });
+  best = candidates[0] || null;
+  const alternates = candidates.slice(1)
+    .filter(function(candidate) { return candidate.text && candidate.score >= 0.35; })
+    .slice(0, 3)
+    .map(function(candidate) { return candidate.text; });
+  return {
+    text: best ? best.text : "",
+    score: best ? best.score : -1,
+    alternates: alternates
+  };
+}
+
+// ── Local correction learning ──
+// When a person fixes a scanner result, remember original OCR text → chosen
+// item on THIS device only (localStorage). Repeated corrections boost future
+// rankings for similar handwriting. Nothing is uploaded anywhere.
+let scannerCorrections = {};
+
+function scannerCorrectionKey(text) {
+  return scannerWords(text).join(" ");
+}
+
+function loadScannerCorrections() {
+  try {
+    const raw = localStorage.getItem("fourSeasonScannerCorrections");
+    scannerCorrections = raw ? JSON.parse(raw) : {};
+    if (!scannerCorrections || typeof scannerCorrections !== "object") scannerCorrections = {};
+  } catch (error) {
+    scannerCorrections = {};
+  }
+}
+
+function saveScannerCorrections() {
+  try { localStorage.setItem("fourSeasonScannerCorrections", JSON.stringify(scannerCorrections)); } catch (error) {}
+}
+
+function recordScannerCorrection(originalRaw, correctedText, chosenName) {
+  const key = scannerCorrectionKey(originalRaw);
+  if (!key || !chosenName) return;
+  const entry = scannerCorrections[key] || { choices: {}, updated: 0 };
+  entry.choices[chosenName] = (entry.choices[chosenName] || 0) + 1;
+  entry.corrected = String(correctedText || originalRaw);
+  entry.updated = Date.now();
+  scannerCorrections[key] = entry;
+  const keys = Object.keys(scannerCorrections);
+  if (keys.length > 200) {
+    keys.sort(function(a, b) { return (scannerCorrections[a].updated || 0) - (scannerCorrections[b].updated || 0); });
+    delete scannerCorrections[keys[0]];
+  }
+  saveScannerCorrections();
+}
+
+function scannerLearnedBoost(rawText, candidateName) {
+  const key = scannerCorrectionKey(rawText);
+  if (!key) return 0;
+  let boost = 0;
+  Object.keys(scannerCorrections).forEach(function(storedKey) {
+    if (storedKey !== key && scannerEditDistance(key, storedKey) > 2) return;
+    const count = (scannerCorrections[storedKey].choices || {})[candidateName] || 0;
+    if (!count) return;
+    const strength = Math.min(0.12, 0.05 + 0.025 * count) * (storedKey === key ? 1 : 0.6);
+    boost = Math.max(boost, strength);
+  });
+  return boost;
+}
+
+function scannerLearnedKeyBoost(key) {
+  if (!key || !scannerCorrections[key]) return 0;
+  const choices = scannerCorrections[key].choices || {};
+  let total = 0;
+  Object.keys(choices).forEach(function(name) { total += choices[name]; });
+  return Math.min(0.15, 0.05 * total);
+}
+
+function clearScannerCorrections() {
+  scannerCorrections = {};
+  try { localStorage.removeItem("fourSeasonScannerCorrections"); } catch (error) {}
+  setScannerStatus("success", "Learned handwriting corrections were cleared on this device.");
+}
+
+loadScannerCorrections();
+
 function scannerClassifyDinnerCodeMask(width, height, mask) {
   // Remove isolated form fragments before measuring the # and numeral. Mobile
   // Safari can resample the same crop differently from desktop browsers, and
@@ -2325,6 +2730,9 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   // right, which avoids depending on general sentence handwriting OCR.
   const verticalRuns = projectionRuns(columnInk, boxHeight * 0.25)
     .filter(function(run) { return run.center > boxWidth * 0.04; });
+  // Words such as Water or Pepsi produce many tall strokes; a handwritten #
+  // code produces only a few. Refuse early instead of misreading a word.
+  if (verticalRuns.length >= 5) return null;
   let hashPair = null;
   verticalRuns.forEach(function(first, firstIndex) {
     verticalRuns.slice(firstIndex + 1).forEach(function(second) {
@@ -2350,6 +2758,7 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   // cleanup. Keep a single strong crossbar eligible for the stricter #1 shape
   // test below; #2 and #3 still require both crossbars.
   if (!horizontalRuns.length) return null;
+  if (horizontalRuns.length > 5) return null;
 
   const activeColumns = [];
   for (let x = 0; x < boxWidth; x++) if (columnInk[x]) activeColumns.push(x);
@@ -2385,6 +2794,9 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   const digitWidth = digitMaxX - digitMinX + 1;
   const digitHeight = digitMaxY - digitMinY + 1;
   if (digitHeight < boxHeight * 0.45 || digitWidth < boxHeight * 0.18) return "#?";
+  // A region much wider than tall after the hash is word letters, not one
+  // numeral; never classify it as a digit.
+  if (digitWidth > digitHeight * 1.3) return "#?";
 
   let digitInk = 0;
   let bottomInk = 0;
@@ -2432,6 +2844,119 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   if (hasCrossbarPair && bottomShare >= 0.38 && ratio >= 1.42 && leftShare < 0.28 && middleShare > 0.34) return "#2";
   if (ratio < 0.75 && rightShare > 0.50 && middleShare < 0.18 && bottomSpan > 0.72) return "#1";
   if (bottomShare >= 0.38 && ratio < 1.42 && bottomSpan > 0.72 && topSpan < 0.68) return "#1";
+
+  // ── General #1–#8 numeral classifier ──
+  // Analyze the numeral's strokes with horizontal-band run counts (how many
+  // times each band crosses ink), band spans, and centroid drift. This votes
+  // for every digit and only answers when one digit clearly wins; otherwise
+  // it returns "#?" so a person or the sequence pass resolves it.
+  const bandCount = 12;
+  const bandRuns = new Uint8Array(bandCount);
+  const bandSpans = new Float32Array(bandCount);
+  const bandCentroids = new Float32Array(bandCount);
+  for (let band = 0; band < bandCount; band++) {
+    const yFrom = Math.floor(band * digitHeight / bandCount);
+    const yTo = Math.max(yFrom, Math.floor((band + 1) * digitHeight / bandCount) - 1);
+    let bandMinX = digitWidth;
+    let bandMaxX = -1;
+    let bandInkTotal = 0;
+    let bandCxSum = 0;
+    let maxRuns = 0;
+    for (let y = yFrom; y <= yTo; y++) {
+      let runs = 0;
+      let previous = 0;
+      for (let x = 0; x < digitWidth; x++) {
+        const on = mask[(minY + digitMinY + y) * width + minX + digitMinX + x] ? 1 : 0;
+        if (on) {
+          bandInkTotal++;
+          bandCxSum += x;
+          if (x < bandMinX) bandMinX = x;
+          if (x > bandMaxX) bandMaxX = x;
+          if (!previous) runs++;
+        }
+        previous = on;
+      }
+      if (runs > maxRuns) maxRuns = runs;
+    }
+    bandRuns[band] = maxRuns;
+    bandSpans[band] = bandMaxX >= bandMinX ? (bandMaxX - bandMinX + 1) / digitWidth : 0;
+    bandCentroids[band] = bandInkTotal ? (bandCxSum / bandInkTotal) / digitWidth : 0.5;
+  }
+  let twoRunTop = 0;
+  let twoRunBottom = 0;
+  let singleRunBands = 0;
+  for (let band = 0; band < bandCount; band++) {
+    if (bandRuns[band] >= 2) { if (band < bandCount / 2) twoRunTop++; else twoRunBottom++; }
+    if (bandRuns[band] === 1) singleRunBands++;
+  }
+  const wideTop = Math.max(bandSpans[0], bandSpans[1]);
+  const wideBottom = Math.max(bandSpans[bandCount - 2], bandSpans[bandCount - 1]);
+  let midBar = 0;
+  for (let band = 5; band <= 8; band++) midBar = Math.max(midBar, bandSpans[band]);
+  const upperCentroid = (bandCentroids[2] + bandCentroids[3]) / 2;
+  const lowerCentroid = (bandCentroids[8] + bandCentroids[9]) / 2;
+
+  const digitScores = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 };
+  // 1 — narrow single stroke from top to bottom
+  if (ratio < 0.62) digitScores[1] += 2;
+  if (singleRunBands >= 10) digitScores[1] += 2;
+  if (wideTop < 0.6) digitScores[1] += 1;
+  if (twoRunTop + twoRunBottom <= 1) digitScores[1] += 1;
+  if (wideTop > 0.75) digitScores[1] -= 2;
+  // 7 — wide top bar, one descending stroke, narrow bottom
+  if (wideTop >= 0.68) digitScores[7] += 2;
+  if (wideBottom < 0.5) digitScores[7] += 1;
+  if (twoRunBottom === 0) digitScores[7] += 1;
+  if (singleRunBands >= 8) digitScores[7] += 1;
+  if (bottomShare >= 0.34) digitScores[7] -= 2;
+  // 2 — flat base, curved top, diagonal drifting left through the middle
+  if (wideBottom >= 0.62) digitScores[2] += 2;
+  if (bottomShare >= 0.32) digitScores[2] += 1;
+  if (bandCentroids[7] < bandCentroids[3]) digitScores[2] += 1;
+  if (twoRunBottom <= 1) digitScores[2] += 1;
+  if (wideTop >= 0.85) digitScores[2] -= 1;
+  // 3 — two right-side bulges, open on the left
+  if (rightShare > 0.42) digitScores[3] += 2;
+  if (leftShare < 0.24) digitScores[3] += 2;
+  if (wideBottom < 0.62) digitScores[3] += 1;
+  if (twoRunTop + twoRunBottom <= 3) digitScores[3] += 1;
+  // 4 — crossbar around 55–70% height with two strokes above it
+  if (midBar >= 0.7) digitScores[4] += 2;
+  if (twoRunTop >= 3) digitScores[4] += 2;
+  if (wideBottom < 0.5) digitScores[4] += 1;
+  if (lowerCentroid > 0.55) digitScores[4] += 1;
+  // 5 — top bar, upper-left stem, lower-right bowl
+  if (wideTop >= 0.62) digitScores[5] += 2;
+  if (upperCentroid < 0.45) digitScores[5] += 2;
+  if (lowerCentroid > 0.52) digitScores[5] += 1;
+  if (twoRunTop <= 1) digitScores[5] += 1;
+  if (wideBottom >= 0.75) digitScores[5] -= 1;
+  // 6 — closed loop in the lower half below a single leaning stem
+  if (twoRunBottom >= 3) digitScores[6] += 2;
+  if (twoRunTop <= 1) digitScores[6] += 2;
+  if (bandCentroids[1] < 0.5) digitScores[6] += 1;
+  if (bottomShare > 0.42) digitScores[6] += 1;
+  // 8 — loops above and below a narrow waist
+  if (twoRunTop >= 2 && twoRunBottom >= 2) digitScores[8] += 3;
+  if (ratio >= 0.45 && ratio <= 0.9) digitScores[8] += 1;
+  if (bandSpans[5] < bandSpans[2] && bandSpans[5] < bandSpans[9]) digitScores[8] += 1;
+
+  let bestDigit = 0;
+  let bestDigitScore = -1;
+  let secondDigitScore = -1;
+  for (let digit = 1; digit <= 8; digit++) {
+    const score = digitScores[digit];
+    if (score > bestDigitScore) {
+      secondDigitScore = bestDigitScore;
+      bestDigitScore = score;
+      bestDigit = digit;
+    } else if (score > secondDigitScore) {
+      secondDigitScore = score;
+    }
+  }
+  // Answer only on a clear win; a clear hash with an uncertain numeral is
+  // reported as "#?" so the sequence pass or the reviewer can resolve it.
+  if (bestDigitScore >= 4 && bestDigitScore - secondDigitScore >= 2) return "#" + bestDigit;
   return "#?";
 }
 
@@ -2451,7 +2976,7 @@ async function scannerDetectDinnerCodeFromCrop(dataUrl) {
     for (let point = 0, offset = 0; point < luminance.length; point++, offset += 4) {
       luminance[point] = Math.round(pixels[offset] * 0.299 + pixels[offset + 1] * 0.587 + pixels[offset + 2] * 0.114);
     }
-    const votes = { "#1": 0, "#2": 0, "#3": 0 };
+    const votes = { "#1": 0, "#2": 0, "#3": 0, "#4": 0, "#5": 0, "#6": 0, "#7": 0, "#8": 0 };
     let hashVotes = 0;
     [120, 150, 180, 205, 225].forEach(function(threshold) {
       const mask = new Uint8Array(width * height);
@@ -2590,6 +3115,11 @@ function scannerOperationalAlias(rawText) {
   // "this after". Treat those narrow, known local-model errors as the free
   // operational Water item instead of discarding an otherwise useful line.
   if (/^(?:this\s+)?after$/.test(phrase) || /^(?:waiter|wader|watter|later)$/.test(phrase)) return "Water";
+  // Guard-railed generic Water repair: same first and last letters as "water"
+  // and within two edits (wator, warer, woter…). Anything shaped differently
+  // is left untouched so unrelated words never become Water.
+  const compact = phrase.replace(/\s+/g, "");
+  if (/^w[a-z]{2,5}r$/.test(compact) && scannerEditDistance(compact, "water") <= 2) return "Water";
   if (/^hot\s+teas?$/.test(phrase)) return "Hot Tea";
   return null;
 }
@@ -2635,7 +3165,8 @@ function scannerMatchLocalLine(rawText, dayPart) {
   }
 
   let scored = scannerMenuFlat.map(function(entry, index) {
-    return { entry: entry, index: index, score: scannerMenuSimilarity(rawText, entry) };
+    const learned = scannerLearnedBoost(rawText, entry.cleanName);
+    return { entry: entry, index: index, score: Math.min(1, scannerMenuSimilarity(rawText, entry) + learned) };
   }).sort(function(a, b) { return b.score - a.score; });
 
   if (dayPart === "lunch") {
@@ -2724,45 +3255,40 @@ async function recognizeTicketLocally(dataUrl) {
   const recognizedLines = [];
   for (let i = 0; i < segmentation.crops.length; i++) {
     setScannerStatus("working", "Reading handwritten line " + (i + 1) + " of " + segmentation.crops.length + " on this device…");
+    const crop = segmentation.crops[i];
+    const yRatio = segmentation.height ? crop.y / segmentation.height : 0;
     try {
-      const yRatio = segmentation.height ? segmentation.crops[i].y / segmentation.height : 0;
       const visualDinnerCode = /^#[1-8]$/.test(String(visualDinnerCodes[i] || "")) ? visualDinnerCodes[i] : null;
       let cleaned = visualDinnerCode || "";
       let score = visualDinnerCode ? 3 : -1;
+      let alternates = [];
       if (!visualDinnerCode) {
-        const generated = await scannerRecognizeCrop(recognizer, segmentation.crops[i].image);
-        cleaned = scannerCleanFormText(generated, yRatio, segmentation.formMode);
-        score = scannerOcrCandidateScore(cleaned);
-        if (score < 0.86 && segmentation.crops[i].alternateImage) {
-          setScannerStatus("working", "Double-checking unclear line " + (i + 1) + " of " + segmentation.crops.length + "…");
-          try {
-            const alternateGenerated = await scannerRecognizeCrop(recognizer, segmentation.crops[i].alternateImage);
-            const alternateCleaned = scannerCleanFormText(alternateGenerated, yRatio, segmentation.formMode);
-            const alternateScore = scannerOcrCandidateScore(alternateCleaned);
-            if (alternateScore > score + 0.03) {
-              cleaned = alternateCleaned;
-              score = alternateScore;
-            }
-          } catch (alternateError) {
-            console.warn("Alternate local OCR pass could not read line", i + 1, alternateError);
-          }
-        }
+        const ensemble = await scannerEnsembleRecognizeLine(recognizer, crop, yRatio, segmentation.formMode, function(tag) {
+          if (tag !== "cleaned") setScannerStatus("working", "Double-checking line " + (i + 1) + " of " + segmentation.crops.length + " (" + tag + " pass)…");
+        });
+        cleaned = ensemble.text;
+        score = ensemble.score;
+        alternates = ensemble.alternates;
       }
-      // Do not present fluent-looking model guesses as transcriptions when
-      // neither pass has meaningful menu or code evidence. The source crop is
+      // Do not present fluent-looking model guesses as transcriptions when no
+      // pass produced meaningful menu or code evidence. The source crop is
       // still shown so staff can resolve it manually.
       if (score < 0.52) cleaned = "";
       recognizedLines.push({
         text: cleaned || "[unreadable handwriting]",
-        image: segmentation.crops[i].image,
-        yRatio: yRatio
+        image: crop.image,
+        yRatio: yRatio,
+        alternates: alternates,
+        rect: crop.rect || null
       });
     } catch (error) {
       console.warn("Local OCR could not read line", i + 1, error);
       recognizedLines.push({
         text: "[unreadable handwriting]",
-        image: segmentation.crops[i].image,
-        yRatio: segmentation.height ? segmentation.crops[i].y / segmentation.height : 0
+        image: crop.image,
+        yRatio: yRatio,
+        alternates: [],
+        rect: crop.rect || null
       });
     }
   }
@@ -2778,6 +3304,8 @@ async function recognizeTicketLocally(dataUrl) {
   const items = orderLines.map(function(line) {
     const item = scannerMatchLocalLine(line.text, dayPart);
     item.source_image = line.image;
+    item.alt_texts = line.alternates || [];
+    item.source_rect = line.rect || null;
     return item;
   });
   const unreadable = items.filter(function(item) { return item.confidence === "low"; }).length;
@@ -2865,6 +3393,10 @@ function normalizeScannerResult(result) {
         confidence: confidence,
         needs_review: Boolean(item && item.needs_review) || ambiguous || confidence !== "high",
         _sourceImage: item && item.source_image ? String(item.source_image) : null,
+        _originalRaw: item && item.raw_text != null ? String(item.raw_text) : "[illegible]",
+        _altTexts: Array.isArray(item && item.alt_texts) ? item.alt_texts.map(String) : [],
+        _rect: item && item.source_rect && typeof item.source_rect === "object" ? item.source_rect : null,
+        _padLevel: 1,
         _menuIndex: -1,
         _custom: Boolean(item && item.custom_item) || String(item && item.category || "").toLowerCase() === "custom",
         _selected: false
@@ -2960,6 +3492,23 @@ function renderScannerResults() {
       const linePreview = item._sourceImage
         ? '<img class="scanner-line-preview" src="' + scannerEsc(item._sourceImage) + '" alt="Isolated handwriting for ticket line ' + (index + 1) + '">'
         : "";
+      const lineTools = item._rect && item._sourceImage
+        ? '<div class="scanner-line-tools">' +
+            '<button type="button" class="scanner-tool-btn" data-scanner-rescan="' + index + '">\u21bb Rescan line</button>' +
+            '<button type="button" class="scanner-tool-btn" data-scanner-expand="' + index + '">\u2922 Expand crop</button>' +
+          '</div>'
+        : "";
+      const rawKey = scannerWords(item.raw_text).join(" ");
+      const altTexts = (item._altTexts || []).filter(function(text) {
+        return text && scannerWords(text).join(" ") !== rawKey;
+      }).slice(0, 3);
+      const suggestions = item.needs_review && altTexts.length
+        ? '<div class="scanner-suggest-row"><span class="scanner-mini-label" style="flex-basis:100%">Other possible readings</span>' +
+            altTexts.map(function(text) {
+              return '<button type="button" class="scanner-suggest-chip" data-scanner-suggest="' + index + '" data-suggest-text="' + scannerEsc(text) + '">' + scannerEsc(text) + '</button>';
+            }).join("") +
+          '</div>'
+        : "";
       const candidates = item.ambiguous_candidates.length
         ? '<div class="scanner-candidates"><strong>Possible matches:</strong> ' + scannerEsc(item.ambiguous_candidates.join(" · ")) + "</div>"
         : "";
@@ -2972,7 +3521,7 @@ function renderScannerResults() {
           "<div><div class=\"scanner-item-number\">Ticket line " + (index + 1) + "</div><div class=\"scanner-raw-line\">" + scannerEsc(item.raw_text) + "</div></div>" +
           '<span class="scanner-badge ' + scannerEsc(item.confidence) + '">' + scannerEsc(item.confidence) + "</span>" +
         "</div>" +
-        linePreview +
+        linePreview + lineTools + suggestions +
         '<div class="scanner-item-grid">' +
           '<div><label class="scanner-mini-label">Quantity</label><input type="number" min="1" max="99" value="' + item.quantity + '" data-scanner-field="quantity" data-index="' + index + '"></div>' +
           '<div class="wide"><label class="scanner-mini-label">Confirmed item</label><select data-scanner-field="match" data-index="' + index + '">' + scannerMenuOptions(item._menuIndex, item._custom) + "</select></div>" +
@@ -3037,6 +3586,15 @@ function renderScannerResults() {
       updateScannerItem(Number(this.dataset.index), this.dataset.scannerField, this.value);
     });
   });
+  container.querySelectorAll("[data-scanner-rescan]").forEach(function(button) {
+    button.addEventListener("click", function() { rescanScannerLine(Number(this.dataset.scannerRescan), false); });
+  });
+  container.querySelectorAll("[data-scanner-expand]").forEach(function(button) {
+    button.addEventListener("click", function() { rescanScannerLine(Number(this.dataset.scannerExpand), true); });
+  });
+  container.querySelectorAll("[data-scanner-suggest]").forEach(function(button) {
+    button.addEventListener("click", function() { applyScannerSuggestion(Number(this.dataset.scannerSuggest), this.dataset.suggestText); });
+  });
   document.getElementById("scannerCopyBtn").addEventListener("click", copyScannerJson);
   document.getElementById("scannerDownloadBtn").addEventListener("click", downloadScannerJson);
   document.getElementById("scannerImportBtn").addEventListener("click", addScannedItemsToOrder);
@@ -3080,6 +3638,7 @@ function updateScannerItem(index, field, value) {
       item.confidence = customName ? "high" : "low";
       item.needs_review = !customName;
       item._selected = Boolean(customName);
+      if (customName) recordScannerCorrection(item._originalRaw || item.raw_text, item.raw_text, customName);
       if (!customName) setScannerStatus("error", "Edit the raw handwriting into a readable item name, then choose custom item again.");
       recalculateScannerSubtotal(scannerResult);
       renderScannerResults();
@@ -3098,6 +3657,7 @@ function updateScannerItem(index, field, value) {
       item.confidence = "high";
       item.needs_review = false;
       item._selected = true;
+      recordScannerCorrection(item._originalRaw || item.raw_text, item.raw_text, entry.cleanName);
     } else {
       item._custom = false;
       item.matched_item = null;
@@ -3110,6 +3670,73 @@ function updateScannerItem(index, field, value) {
   }
   recalculateScannerSubtotal(scannerResult);
   renderScannerResults();
+}
+
+function scannerRebuildItemFromText(index, text, sourceImage) {
+  const item = scannerResult && scannerResult.items[index];
+  if (!item) return;
+  const rebuilt = scannerMatchLocalLine(text || "[unreadable handwriting]", scannerResult.ticket_read.day_part_hint);
+  item.raw_text = rebuilt.raw_text;
+  item.quantity = rebuilt.quantity;
+  item.matched_item = rebuilt.matched_item;
+  item.category = rebuilt.category;
+  item.price_each = rebuilt.price_each;
+  item.modifiers = rebuilt.modifiers;
+  item.ambiguous = rebuilt.ambiguous;
+  item.ambiguous_candidates = rebuilt.ambiguous_candidates;
+  item.confidence = rebuilt.confidence;
+  item.needs_review = rebuilt.needs_review;
+  item._custom = false;
+  if (sourceImage) item._sourceImage = sourceImage;
+  item._menuIndex = item.ambiguous ? -1 : resolveScannerMenuIndex(item);
+  if (item._menuIndex < 0 && item.matched_item) item.needs_review = true;
+  item._selected = item._menuIndex >= 0 && !item.needs_review;
+  recalculateScannerSubtotal(scannerResult);
+  renderScannerResults();
+}
+
+function applyScannerSuggestion(index, text) {
+  haptic("light");
+  scannerRebuildItemFromText(index, text);
+}
+
+async function rescanScannerLine(index, expand) {
+  const item = scannerResult && scannerResult.items[index];
+  if (!item) return;
+  if (!item._rect || !scannerLastPrep) {
+    setScannerStatus("error", "This line has no stored crop position; edit the raw handwriting instead.");
+    return;
+  }
+  if (expand) item._padLevel = Math.min(4, (item._padLevel || 1) + 1);
+  setScannerStatus("working", expand ? "Expanding the crop and rescanning line " + (index + 1) + "\u2026" : "Rescanning line " + (index + 1) + "\u2026");
+  try {
+    const cleanedImage = await loadScannerImage(scannerLastPrep.cleanedUrl);
+    const originalImage = await loadScannerImage(scannerLastPrep.originalUrl);
+    const rendered = scannerRenderCropFromSources(cleanedImage, originalImage, item._rect, item._padLevel || 1, scannerLastPrep.width, scannerLastPrep.height);
+    const crop = { image: rendered.image, alternateImage: rendered.alternateImage };
+    const yRatio = scannerLastPrep.height ? item._rect.y1 / scannerLastPrep.height : 0;
+    let text = "";
+    let score = -1;
+    let alternates = [];
+    if (scannerLastPrep.formMode) {
+      const code = await scannerDetectDinnerCodeFromCrop(crop.image);
+      if (/^#[1-8]$/.test(String(code || ""))) { text = code; score = 3; }
+    }
+    if (!text) {
+      const recognizer = await loadScannerOcrPipeline();
+      const ensemble = await scannerEnsembleRecognizeLine(recognizer, crop, yRatio, scannerLastPrep.formMode, null);
+      text = ensemble.text;
+      score = ensemble.score;
+      alternates = ensemble.alternates;
+    }
+    if (score < 0.52) text = "";
+    item._altTexts = alternates;
+    scannerRebuildItemFromText(index, text || "[unreadable handwriting]", crop.image);
+    setScannerStatus("success", "Line " + (index + 1) + " was rescanned. Review the result before importing.");
+  } catch (error) {
+    console.warn("Rescan failed for line", index + 1, error);
+    setScannerStatus("error", "That line could not be rescanned.");
+  }
 }
 
 function recalculateScannerSubtotal(result) {

@@ -681,6 +681,7 @@
   .scanner-import-check { width: 20px !important; height: 20px; margin-top: 1px; accent-color: #0e7c6b; }
   .scanner-raw-line { font: 700 15px/1.35 inherit; color: #262626; }
   .scanner-item-number { font-size: 11px; color: #9b9388; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .scanner-line-preview { display: block; width: 100%; max-height: 112px; object-fit: contain; object-position: left center; margin: 0 0 11px; padding: 6px; border: 1px solid #e2ddd5; border-radius: 8px; background: #fff; }
   .scanner-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.35px; white-space: nowrap; }
   .scanner-badge.high { color: #17643a; background: #e5f7eb; }
   .scanner-badge.medium { color: #8b5a12; background: #fff1ce; }
@@ -1711,7 +1712,9 @@ function scannerDetectPaperBounds(image) {
     const minimum = Math.min(red, green, blue);
     const saturation = maximum ? (maximum - minimum) / maximum : 0;
     const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
-    if (luminance >= paperLuminance && saturation <= 0.58) mask[p] = 1;
+    // The paper is warm but much less saturated than the gold tabletop. A
+    // tighter cutoff prevents the table from joining the ticket component.
+    if (luminance >= paperLuminance && saturation <= 0.50) mask[p] = 1;
   }
 
   const stack = new Int32Array(mask.length);
@@ -1811,7 +1814,9 @@ async function segmentTicketIntoLines(dataUrl) {
   // separately so they do not become dozens of fake handwriting lines.
   const ruleRows = new Uint8Array(height);
   const strongRuleRows = new Uint8Array(height);
-  const ruleRowThreshold = Math.max(30, Math.round(width * 0.30));
+  // Allow for a slightly tilted ticket: a sloped rule occupies only part of
+  // one raster row, so 20% is a better form-line signal than 30%.
+  const ruleRowThreshold = Math.max(30, Math.round(width * 0.20));
   for (let y = 0; y < height; y++) {
     if (rawRowInk[y] >= ruleRowThreshold) strongRuleRows[y] = 1;
   }
@@ -1822,8 +1827,8 @@ async function segmentTicketIntoLines(dataUrl) {
     insideRule = Boolean(strongRuleRows[y]);
   }
   const formMode = ruleCount >= 5;
+  const rulePadding = Math.max(1, Math.round(width * 0.002));
   if (formMode) {
-    const rulePadding = Math.max(1, Math.round(width * 0.002));
     for (let y = 0; y < height; y++) {
       if (!strongRuleRows[y]) continue;
       for (let fill = Math.max(0, y - rulePadding); fill <= Math.min(height - 1, y + rulePadding); fill++) {
@@ -1859,22 +1864,60 @@ async function segmentTicketIntoLines(dataUrl) {
   const cleanedPixels = cleanedCtx.createImageData(width, height);
   cleanedPixels.data.set(pixels.data);
   if (formMode) {
+    // TrOCR performs much more reliably on clean black writing over white.
+    // Rebuild the image from the dark ink mask instead of feeding it shadows,
+    // paper color, form printing, and tabletop texture.
+    for (let offset = 0; offset < cleanedPixels.data.length; offset += 4) {
+      cleanedPixels.data[offset] = 255;
+      cleanedPixels.data[offset + 1] = 255;
+      cleanedPixels.data[offset + 2] = 255;
+      cleanedPixels.data[offset + 3] = 255;
+    }
+    const nearestAbove = new Int32Array(height);
+    const nearestBelow = new Int32Array(height);
+    let nearest = -1;
+    for (let y = 0; y < height; y++) {
+      if (!ruleRows[y]) nearest = y;
+      nearestAbove[y] = nearest;
+    }
+    nearest = -1;
+    for (let y = height - 1; y >= 0; y--) {
+      if (!ruleRows[y]) nearest = y;
+      nearestBelow[y] = nearest;
+    }
+    const maximumBridge = Math.max(8, Math.round(height * 0.012));
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        if (!ruleRows[y] && !ruleColumns[x]) continue;
-        const offset = (y * width + x) * 4;
-        cleanedPixels.data[offset] = 255;
-        cleanedPixels.data[offset + 1] = 255;
-        cleanedPixels.data[offset + 2] = 255;
+        if (ruleColumns[x]) continue;
+        const point = y * width + x;
+        let keepInk = !ruleRows[y] && gray[point] < threshold;
+        if (ruleRows[y]) {
+          const above = nearestAbove[y];
+          const below = nearestBelow[y];
+          if (above >= 0 && below >= 0 && below - above <= maximumBridge &&
+              gray[above * width + x] < threshold && gray[below * width + x] < threshold) {
+            keepInk = true;
+          }
+        }
+        if (!keepInk) continue;
+        const offset = point * 4;
+        cleanedPixels.data[offset] = 0;
+        cleanedPixels.data[offset + 1] = 0;
+        cleanedPixels.data[offset + 2] = 0;
       }
     }
   }
   cleanedCtx.putImageData(cleanedPixels, 0, 0);
 
-  const scanXStart = formMode ? Math.max(edgeMargin, Math.round(width * 0.05)) : edgeMargin;
-  const scanXEnd = formMode ? Math.min(width - edgeMargin, Math.round(width * 0.82)) : width - edgeMargin;
+  // On this guest-check layout, handwriting belongs in the main order column.
+  // Excluding the left border and Tax/Total columns removes the last vertical
+  // rules and printed footer labels without touching the order writing.
+  const scanXStart = formMode ? Math.max(edgeMargin, Math.round(width * 0.18)) : edgeMargin;
+  const scanXEnd = formMode ? Math.min(width - edgeMargin, Math.round(width * 0.64)) : width - edgeMargin;
+  const scanYStart = formMode ? Math.round(height * 0.22) : 0;
+  const scanYEnd = formMode ? Math.round(height * 0.90) : height;
   const rowInk = new Uint32Array(height);
-  for (let y = 0; y < height; y++) {
+  for (let y = scanYStart; y < scanYEnd; y++) {
     if (ruleRows[y]) continue;
     const offset = y * width;
     let count = 0;
@@ -1884,9 +1927,15 @@ async function segmentTicketIntoLines(dataUrl) {
     rowInk[y] = count;
   }
 
-  const minimumInk = Math.max(8, Math.round(width * 0.006));
+  const minimumInk = formMode
+    ? Math.max(10, Math.round((scanXEnd - scanXStart) * 0.008))
+    : Math.max(8, Math.round(width * 0.006));
   const active = Array.from(rowInk, function(count) { return count >= minimumInk; });
-  const bridge = Math.max(3, Math.round(height * 0.004));
+  // Handwriting frequently crosses a printed rule. Bridge the removed strip so
+  // one menu item remains one OCR line, while adjacent ticket rows stay apart.
+  const bridge = formMode
+    ? Math.max(12, Math.round(height * 0.015))
+    : Math.max(3, Math.round(height * 0.004));
   let gapStart = -1;
   for (let y = 0; y < height; y++) {
     if (!active[y] && gapStart < 0) gapStart = y;
@@ -1905,13 +1954,17 @@ async function segmentTicketIntoLines(dataUrl) {
     if (on && start < 0) start = y;
     if (!on && start >= 0) {
       const end = y - 1;
-      if (end - start + 1 >= Math.max(6, Math.round(height * 0.004))) segments.push({ start: start, end: end });
+      const minimumHeight = formMode
+        ? Math.max(18, Math.round(height * 0.012))
+        : Math.max(6, Math.round(height * 0.004));
+      if (end - start + 1 >= minimumHeight) segments.push({ start: start, end: end });
       start = -1;
     }
   }
 
   const crops = [];
-  segments.slice(0, 30).forEach(function(segment) {
+  const maximumSegments = formMode ? 12 : 30;
+  segments.slice(0, maximumSegments).forEach(function(segment) {
     const yPad = Math.max(6, Math.round((segment.end - segment.start + 1) * 0.28));
     const y1 = Math.max(0, segment.start - yPad);
     const y2 = Math.min(height - 1, segment.end + yPad);
@@ -1931,8 +1984,8 @@ async function segmentTicketIntoLines(dataUrl) {
     }
     if (!inkPixels || x2 <= x1) return;
     const xPad = Math.max(10, Math.round((y2 - y1 + 1) * 0.4));
-    x1 = Math.max(0, x1 - xPad);
-    x2 = Math.min(width - 1, x2 + xPad);
+    x1 = Math.max(formMode ? scanXStart : 0, x1 - xPad);
+    x2 = Math.min(formMode ? scanXEnd - 1 : width - 1, x2 + xPad);
     const cropWidth = x2 - x1 + 1;
     const cropHeight = y2 - y1 + 1;
     const targetHeight = 96;
@@ -1953,12 +2006,12 @@ async function segmentTicketIntoLines(dataUrl) {
     });
   });
 
-  if (!crops.length) {
+  if (!crops.length && !formMode) {
     crops.push({ image: cleanedCanvas.toDataURL("image/png"), y: 0, inkPixels: 1 });
   }
   return {
     crops: crops,
-    truncated: segments.length > 30,
+    truncated: segments.length > maximumSegments,
     detectedCount: segments.length,
     height: height,
     formMode: formMode,
@@ -1994,6 +2047,20 @@ function scannerCleanFormText(value, yRatio, formMode) {
   let text = cleanLocalOcrText(value);
   if (!formMode || !text) return text;
   const lower = text.toLowerCase();
+  const camelCaseJumps = (text.match(/[a-z][A-Z]/g) || []).length;
+  const words = text.split(/\s+/).filter(Boolean);
+  const repeatedZeros = (text.match(/\b0{2,}\b/g) || []).length;
+  const repeatedWordCounts = {};
+  let mostRepeated = 0;
+  words.forEach(function(word) {
+    const key = word.toLowerCase();
+    repeatedWordCounts[key] = (repeatedWordCounts[key] || 0) + 1;
+    mostRepeated = Math.max(mostRepeated, repeatedWordCounts[key]);
+  });
+  // TrOCR can generate fluent-looking or repetitive text when it is given a
+  // form fragment instead of handwriting. Discard those known failure shapes.
+  if (text.length > 72 || words.length > 10 || camelCaseJumps >= 2 ||
+      repeatedZeros >= 4 || mostRepeated >= 5) return "";
   if (/guest\s*check/.test(lower)) return "";
   const headingWords = ["appt", "appetizer", "soup", "salad", "entree", "dinner", "dessert", "beverage"];
   const headingMatches = headingWords.filter(function(word) { return lower.indexOf(word) >= 0; }).length;
@@ -2048,6 +2115,7 @@ function scannerMenuSimilarity(rawText, entry) {
   const query = queryWords.join("");
   const candidate = candidateWords.join("");
   const maxLength = Math.max(query.length, candidate.length);
+  const lengthRatio = Math.min(query.length, candidate.length) / Math.max(1, maxLength);
   const charScore = maxLength ? 1 - scannerEditDistance(query, candidate) / maxLength : 0;
   const querySet = new Set(queryWords);
   const candidateSet = new Set(candidateWords);
@@ -2055,8 +2123,30 @@ function scannerMenuSimilarity(rawText, entry) {
   querySet.forEach(function(word) { if (candidateSet.has(word)) overlap++; });
   const coverage = overlap / Math.max(1, Math.min(querySet.size, candidateSet.size));
   let score = Math.max(charScore, charScore * 0.55 + coverage * 0.45);
-  if (candidate.indexOf(query) >= 0 || query.indexOf(candidate) >= 0) score = Math.max(score, 0.88);
+  if (queryWords.join(" ") === candidateWords.join(" ")) score = 1;
+  // Never promote a short menu name merely because its letters occur inside a
+  // longer unrelated OCR word (for example, Chang inside "changes").
+  if (!overlap && charScore < 0.76) score = Math.min(score, 0.49);
+  if (lengthRatio < 0.48 || queryWords.length > candidateWords.length + 3) score = Math.min(score, 0.50);
   return Math.max(0, Math.min(1, score));
+}
+
+function scannerHasStrongMenuEvidence(rawText, entry) {
+  const queryWords = scannerWords(rawText);
+  const candidateWords = scannerWords(scannerStripMenuCode(entry.cleanName));
+  if (!queryWords.length || !candidateWords.length) return false;
+  if (queryWords.join(" ") === candidateWords.join(" ")) return true;
+  if (queryWords.length > candidateWords.length + 2) return false;
+  let closeMatches = 0;
+  queryWords.forEach(function(queryWord) {
+    const matched = candidateWords.some(function(candidateWord) {
+      const maximum = Math.max(queryWord.length, candidateWord.length);
+      if (maximum < 3) return queryWord === candidateWord;
+      return 1 - scannerEditDistance(queryWord, candidateWord) / maximum >= 0.82;
+    });
+    if (matched) closeMatches++;
+  });
+  return closeMatches >= Math.max(1, Math.ceil(queryWords.length * 0.75));
 }
 
 function scannerDetectCode(rawText) {
@@ -2064,6 +2154,8 @@ function scannerDetectCode(rawText) {
   let match = text.match(/\bL[\s.#-]*(1[0-8]|[1-9])\b/i);
   if (match) return { type: "lunch", value: "L" + Number(match[1]) };
   match = text.match(/#\s*([1-8])\b/i);
+  if (match) return { type: "dinner", value: "No." + Number(match[1]) };
+  match = text.match(/^\s*([1-8])\s*$/);
   if (match) return { type: "dinner", value: "No." + Number(match[1]) };
   match = text.match(/\b(?:NO|N0)[\s.#-]*([1-8])\b/i);
   if (match) return { type: "dinner", value: "No." + Number(match[1]) };
@@ -2111,6 +2203,9 @@ function scannerDayPartFromLines(lines) {
   const combined = lines.join(" ");
   if (/\blunch\b/i.test(combined)) return "lunch";
   if (/\bdinner\b/i.test(combined)) return "dinner";
+  const detectedCodes = lines.map(scannerDetectCode).filter(Boolean);
+  if (detectedCodes.some(function(code) { return code.type === "lunch"; })) return "lunch";
+  if (detectedCodes.some(function(code) { return code.type === "dinner"; })) return "dinner";
   return "unclear";
 }
 
@@ -2180,7 +2275,7 @@ function scannerMatchLocalLine(rawText, dayPart) {
 
   const top = scored[0];
   const second = scored[1];
-  if (!top || top.score < 0.52) {
+  if (!top || top.score < 0.62) {
     return {
       raw_text: rawText || "[illegible]",
       quantity: quantity,
@@ -2200,7 +2295,7 @@ function scannerMatchLocalLine(rawText, dayPart) {
     return scannerNormalizedName(scannerStripMenuCode(candidate.entry.cleanName)) === topBase &&
       candidate.entry.category !== top.entry.category;
   });
-  const closeTie = second && second.score >= 0.55 && top.score - second.score < 0.055;
+  const closeTie = second && second.score >= 0.65 && top.score - second.score < 0.07;
   if ((sameName.length && dayPart === "unclear") || closeTie) {
     const possibilities = [top].concat(sameName).concat(closeTie ? [second] : []);
     const seen = new Set();
@@ -2225,7 +2320,7 @@ function scannerMatchLocalLine(rawText, dayPart) {
   }
 
   const gap = second ? top.score - second.score : top.score;
-  const high = top.score >= 0.78 && gap >= 0.08;
+  const high = top.score >= 0.86 && gap >= 0.10 && scannerHasStrongMenuEvidence(rawText, top.entry);
   return {
     raw_text: rawText,
     quantity: quantity,
@@ -2243,30 +2338,46 @@ function scannerMatchLocalLine(rawText, dayPart) {
 async function recognizeTicketLocally(dataUrl) {
   const segmentation = await segmentTicketIntoLines(dataUrl);
   const recognizer = await loadScannerOcrPipeline();
-  const rawLines = [];
+  const recognizedLines = [];
   for (let i = 0; i < segmentation.crops.length; i++) {
     setScannerStatus("working", "Reading handwritten line " + (i + 1) + " of " + segmentation.crops.length + " on this device…");
     try {
-      const output = await recognizer(segmentation.crops[i].image, { max_new_tokens: 64 });
+      const output = await recognizer(segmentation.crops[i].image, {
+        max_new_tokens: 32,
+        num_beams: 4,
+        early_stopping: true
+      });
       const generated = Array.isArray(output) && output[0] ? output[0].generated_text : "";
       const yRatio = segmentation.height ? segmentation.crops[i].y / segmentation.height : 0;
       const cleaned = scannerCleanFormText(generated, yRatio, segmentation.formMode);
-      if (cleaned) rawLines.push(cleaned);
-      else if (!segmentation.formMode) rawLines.push("[illegible mark]");
+      recognizedLines.push({
+        text: cleaned || "[unreadable handwriting]",
+        image: segmentation.crops[i].image,
+        yRatio: yRatio
+      });
     } catch (error) {
       console.warn("Local OCR could not read line", i + 1, error);
-      if (!segmentation.formMode) rawLines.push("[illegible mark]");
+      recognizedLines.push({
+        text: "[unreadable handwriting]",
+        image: segmentation.crops[i].image,
+        yRatio: segmentation.height ? segmentation.crops[i].y / segmentation.height : 0
+      });
     }
   }
 
+  const rawLines = recognizedLines.map(function(line) { return line.text; });
   const dayPart = scannerDayPartFromLines(rawLines);
   const headerLines = [];
   const orderLines = [];
-  rawLines.forEach(function(line, index) {
-    if (scannerLooksLikeHeader(line, index, rawLines.length)) headerLines.push(line);
+  recognizedLines.forEach(function(line, index) {
+    if (!segmentation.formMode && scannerLooksLikeHeader(line.text, index, rawLines.length)) headerLines.push(line.text);
     else orderLines.push(line);
   });
-  const items = orderLines.map(function(line) { return scannerMatchLocalLine(line, dayPart); });
+  const items = orderLines.map(function(line) {
+    const item = scannerMatchLocalLine(line.text, dayPart);
+    item.source_image = line.image;
+    return item;
+  });
   const unreadable = items.filter(function(item) { return item.confidence === "low"; }).length;
   const ambiguous = items.filter(function(item) { return item.ambiguous; }).length;
   const flags = ["Local handwriting OCR is approximate; confirm every line before sending the order to the kitchen."];
@@ -2277,7 +2388,7 @@ async function recognizeTicketLocally(dataUrl) {
   if (segmentation.truncated) flags.push("More than 30 marks were detected; only the first 30 regions were processed.");
   return {
     ticket_read: {
-      legible: rawLines.some(function(line) { return line !== "[illegible mark]"; }),
+      legible: rawLines.some(function(line) { return line !== "[unreadable handwriting]"; }),
       day_part_hint: dayPart,
       header_notes: headerLines.length ? headerLines.join(" · ") : null
     },
@@ -2351,6 +2462,7 @@ function normalizeScannerResult(result) {
         ambiguous_candidates: Array.isArray(item && item.ambiguous_candidates) ? item.ambiguous_candidates.map(String) : [],
         confidence: confidence,
         needs_review: Boolean(item && item.needs_review) || ambiguous || confidence !== "high",
+        _sourceImage: item && item.source_image ? String(item.source_image) : null,
         _menuIndex: -1,
         _selected: false
       };
@@ -2433,6 +2545,9 @@ function renderScannerResults() {
   } else {
     itemsHtml = '<div class="scanner-item-list">' + scannerResult.items.map(function(item, index) {
       const cardClass = item.confidence === "low" ? " low-confidence" : (item.needs_review ? " needs-review" : "");
+      const linePreview = item._sourceImage
+        ? '<img class="scanner-line-preview" src="' + scannerEsc(item._sourceImage) + '" alt="Isolated handwriting for ticket line ' + (index + 1) + '">'
+        : "";
       const candidates = item.ambiguous_candidates.length
         ? '<div class="scanner-candidates"><strong>Possible matches:</strong> ' + scannerEsc(item.ambiguous_candidates.join(" · ")) + "</div>"
         : "";
@@ -2442,6 +2557,7 @@ function renderScannerResults() {
           "<div><div class=\"scanner-item-number\">Ticket line " + (index + 1) + "</div><div class=\"scanner-raw-line\">" + scannerEsc(item.raw_text) + "</div></div>" +
           '<span class="scanner-badge ' + scannerEsc(item.confidence) + '">' + scannerEsc(item.confidence) + "</span>" +
         "</div>" +
+        linePreview +
         '<div class="scanner-item-grid">' +
           '<div><label class="scanner-mini-label">Quantity</label><input type="number" min="1" max="99" value="' + item.quantity + '" data-scanner-field="quantity" data-index="' + index + '"></div>' +
           '<div class="wide"><label class="scanner-mini-label">Confirmed menu item</label><select data-scanner-field="match" data-index="' + index + '">' + scannerMenuOptions(item._menuIndex) + "</select></div>" +

@@ -1977,7 +1977,10 @@ async function segmentTicketIntoLines(dataUrl) {
   const crops = [];
   const maximumSegments = formMode ? 12 : 30;
   segments.slice(0, maximumSegments).forEach(function(segment) {
-    const yPad = Math.max(6, Math.round((segment.end - segment.start + 1) * 0.28));
+    // Give short symbols and tall handwritten strokes extra breathing room.
+    // This prevents the top of a numeral or the lower stroke of a # from being
+    // clipped when it sits close to a printed guest-check rule.
+    const yPad = Math.max(8, Math.round((segment.end - segment.start + 1) * 0.45));
     const y1 = Math.max(0, segment.start - yPad);
     const y2 = Math.min(height - 1, segment.end + yPad);
     let x1 = width - 1;
@@ -1995,7 +1998,7 @@ async function segmentTicketIntoLines(dataUrl) {
       }
     }
     if (!inkPixels || x2 <= x1) return;
-    const xPad = Math.max(10, Math.round((y2 - y1 + 1) * 0.4));
+    const xPad = Math.max(12, Math.round((y2 - y1 + 1) * 0.55));
     x1 = Math.max(formMode ? scanXStart : 0, x1 - xPad);
     x2 = Math.min(formMode ? scanXEnd - 1 : width - 1, x2 + xPad);
     const cropWidth = x2 - x1 + 1;
@@ -2269,22 +2272,25 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
       if (distance >= boxHeight * 0.10 && distance <= boxHeight * 0.45) hasCrossbarPair = true;
     });
   });
-  if (!hasCrossbarPair) return null;
+  // A printed form rule can overlap and erase one horizontal # stroke during
+  // cleanup. Keep a single strong crossbar eligible for the stricter #1 shape
+  // test below; #2 and #3 still require both crossbars.
+  if (!horizontalRuns.length) return null;
 
   const activeColumns = [];
   for (let x = 0; x < boxWidth; x++) if (columnInk[x]) activeColumns.push(x);
   const searchAfter = hashPair.second.center + hashPair.distance * 0.20;
   let split = -1;
-  let largestGap = -1;
   for (let i = 0; i + 1 < activeColumns.length; i++) {
     const left = activeColumns[i];
     const right = activeColumns[i + 1];
     const gap = right - left - 1;
     if (left <= searchAfter || gap < Math.max(2, Math.floor(boxHeight * 0.02))) continue;
-    if (gap > largestGap) {
-      largestGap = gap;
-      split = right;
-    }
+    // The first meaningful gap after the hash separates it from the numeral.
+    // Choosing the largest gap can incorrectly split a handwritten 1 whose
+    // top hook was separated by guest-check line removal.
+    split = right;
+    break;
   }
   if (split < 0 || split >= boxWidth - 2) return null;
 
@@ -2348,8 +2354,9 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   const bottomSpan = bottomMaxX >= bottomMinX ? (bottomMaxX - bottomMinX + 1) / digitWidth : 0;
   const largestQuarter = Math.max.apply(null, quarterInk) / digitInk;
 
-  if (bottomShare < 0.38 && rightShare > 0.40 && leftShare < 0.22 && largestQuarter < 0.40) return "#3";
-  if (bottomShare >= 0.38 && ratio >= 1.42 && leftShare < 0.28 && middleShare > 0.34) return "#2";
+  if (hasCrossbarPair && bottomShare < 0.38 && rightShare > 0.40 && leftShare < 0.22 && largestQuarter < 0.40) return "#3";
+  if (hasCrossbarPair && bottomShare >= 0.38 && ratio >= 1.42 && leftShare < 0.28 && middleShare > 0.34) return "#2";
+  if (ratio < 0.75 && rightShare > 0.50 && middleShare < 0.18 && bottomSpan > 0.72) return "#1";
   if (bottomShare >= 0.38 && ratio < 1.42 && bottomSpan > 0.72 && topSpan < 0.68) return "#1";
   return null;
 }
@@ -2454,6 +2461,10 @@ function scannerOperationalAlias(rawText) {
     .trim();
   if (/^plates?$/.test(phrase)) return "Paper Plates";
   if (/^waters?$/.test(phrase)) return "Water";
+  // TrOCR repeatedly reads this handwriting style's "Water" as "after" or
+  // "this after". Treat those narrow, known local-model errors as the free
+  // operational Water item instead of discarding an otherwise useful line.
+  if (/^(?:this\s+)?after$/.test(phrase) || /^(?:waiter|wader|watter|later)$/.test(phrase)) return "Water";
   if (/^hot\s+teas?$/.test(phrase)) return "Hot Tea";
   return null;
 }

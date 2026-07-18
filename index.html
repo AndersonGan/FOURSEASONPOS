@@ -2859,16 +2859,16 @@ function scannerLooksLikeHash(width, height, mask, region) {
     }
     return found;
   }
-  const verticalStrokes = runs(columnInk, Math.max(2, boxHeight * 0.30)).length;
-  const horizontalStrokes = runs(rowInk, Math.max(2, boxWidth * 0.30)).length;
-  if (verticalStrokes >= 2 && horizontalStrokes >= 1) return true;
-  if (horizontalStrokes >= 2 && verticalStrokes >= 1) return true;
-  // Fall back on density: a # is a dense lattice inside a roughly square box.
-  let ink = 0;
-  for (let x = 0; x < boxWidth; x++) ink += columnInk[x];
-  const density = ink / (boxWidth * boxHeight);
+  // A "#" needs BOTH axes: two vertical strokes crossed by two horizontal
+  // ones. The earlier build accepted 2-and-1, plus a loose density fallback,
+  // and a cursive "Pe" satisfied both -- which is how "Pepsi" became "#4".
+  // A missed marker costs one tap; a false marker silently books a $17 combo.
+  const verticalStrokes = runs(columnInk, Math.max(2, boxHeight * 0.32)).length;
+  const horizontalStrokes = runs(rowInk, Math.max(2, boxWidth * 0.32)).length;
+  if (verticalStrokes < 2 || horizontalStrokes < 2) return false;
+  // The hash itself is compact and roughly square. Letters are not.
   const aspect = boxWidth / boxHeight;
-  return density > 0.18 && aspect > 0.55 && aspect < 1.9;
+  return aspect > 0.45 && aspect < 1.75;
 }
 
 function scannerIsolateDigitRegion(width, height, mask) {
@@ -2961,8 +2961,15 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   if (inkCount < 40 || maxX <= minX || maxY <= minY) return null;
   const boxWidth = maxX - minX + 1;
   const boxHeight = maxY - minY + 1;
-  // A "#N" pair is wider than tall but not a whole sentence.
-  if (boxWidth < boxHeight * 1.05 || boxWidth > boxHeight * 5.0) return null;
+  // A "#N" pair is modestly wider than tall. The old 5.0 ceiling was wide
+  // enough to admit a five-letter word like "Pepsi" or "water".
+  if (boxWidth < boxHeight * 1.05 || boxWidth > boxHeight * 3.5) return null;
+  // A marker is two glyph groups: the hash and one numeral. A written word
+  // breaks into many more. Count them before going any further.
+  const glyphGroups = working.filter(function(component) {
+    return component.area >= Math.max(12, inkCount * 0.04);
+  }).length;
+  if (glyphGroups > 4) return null;
 
   // Split hash from numeral at the widest vertical whitespace gap in the
   // left-to-right ink profile, searching only the middle of the box.
@@ -3006,6 +3013,13 @@ function scannerClassifyDinnerCodeMask(width, height, mask) {
   const digitWidth = digitRegion.x2 - digitRegion.x1 + 1;
   if (hashWidth < 3 || digitWidth < 3) return "#?";
   if (!scannerLooksLikeHash(width, height, clean, hashRegion)) return null;
+
+  // If the region to the right of the "hash" splits into several marks, this
+  // is writing, not a single numeral.
+  const digitComponents = working.filter(function(component) {
+    return component.minX >= digitRegion.x1 - 1 && component.area >= Math.max(10, inkCount * 0.05);
+  }).length;
+  if (digitComponents > 2) return null;
 
   const digitFeatures = scannerShapeFeatures(width, height, clean, digitRegion);
   if (!digitFeatures) return "#?";
@@ -3051,13 +3065,19 @@ async function scannerDetectDinnerCodeFromCrop(dataUrl) {
     const best = ranked[0];
     const bestVotes = votes[best];
     const secondVotes = votes[ranked[1]];
-    // Sweeping seven thresholds makes agreement meaningful: two matching votes
-    // that beat the runner-up is a solid read. A lone vote is still returned
-    // when nothing contradicts it, because "#?" here loses information that
-    // sequence reconciliation could otherwise use.
-    if (bestVotes >= 2 && bestVotes > secondVotes) return best;
-    if (bestVotes === 1 && secondVotes === 0) return best;
-    if (bestVotes || hashVotes) return "#?";
+    // Three of seven thresholds must agree before this reports a digit. The
+    // previous build accepted a single lone vote, which let one noisy
+    // binarisation of a word masquerade as a menu code.
+    //
+    // Return semantics matter downstream and are now strict:
+    //   "#3"  - a hash was seen AND the numeral was read confidently
+    //   "#?"  - a hash was definitely seen, the numeral was not readable
+    //   null  - no marker on this line at all
+    // Only "#?" is eligible for sequence reconciliation. Nothing else may be
+    // promoted into a menu code.
+    if (bestVotes >= 3 && bestVotes > secondVotes) return best;
+    if (bestVotes >= 2 && bestVotes > secondVotes && !hashVotes) return best;
+    if (bestVotes || hashVotes >= 2) return "#?";
     return null;
   } catch (error) {
     console.warn("Short dinner-code detector could not inspect a line", error);
@@ -3065,8 +3085,13 @@ async function scannerDetectDinnerCodeFromCrop(dataUrl) {
   }
 }
 
+// Codes filled in by sequence reasoning rather than actually read. These are
+// held back for human confirmation: an inferred number must never be billed.
+let scannerInferredCodeFlags = [];
+
 function scannerReconcileDinnerCodeHints(hints) {
   const resolved = hints.slice();
+  scannerInferredCodeFlags = hints.map(function() { return false; });
   let start = 0;
   while (start < hints.length) {
     if (!/^#(?:[1-8]|\?)$/.test(String(hints[start] || ""))) {
@@ -3091,14 +3116,15 @@ function scannerReconcileDinnerCodeHints(hints) {
       // #3 without guessing that every group must begin at one.
       const hasAnchor = hints.slice(start, end + 1).some(function(hint) { return /^#[1-8]$/.test(String(hint)); });
       if (hasAnchor && possibleStarts.length === 1) {
-        for (let offset = 0; offset < runLength; offset++) resolved[start + offset] = "#" + (possibleStarts[0] + offset);
-      } else if (hasAnchor && possibleStarts.length > 1) {
-        // Ambiguous start, but the anchors still pin their own positions and
-        // the lowest consistent start is overwhelmingly the real one on a
-        // guest check, where staff number dinners from #1 downward.
-        const lowest = possibleStarts[0];
-        for (let offset = 0; offset < runLength; offset++) resolved[start + offset] = "#" + (lowest + offset);
+        for (let offset = 0; offset < runLength; offset++) {
+          const wasUncertain = hints[start + offset] === "#?";
+          resolved[start + offset] = "#" + (possibleStarts[0] + offset);
+          if (wasUncertain) scannerInferredCodeFlags[start + offset] = true;
+        }
       }
+      // Deliberately NOT handled any more: an ambiguous start filled from the
+      // lowest consistent number. That guessed at #4 and #5 for two lines that
+      // were really "Pepsi" and "water", then billed them as combos.
       // Deliberately NOT handled: a run with no confident marker anywhere.
       // Numbering an unanchored run from one would invent menu items out of
       // ordinary short handwriting, which is far worse than asking a human.
@@ -3378,8 +3404,35 @@ async function recognizeTicketLocally(dataUrl) {
     try {
       const yRatio = segmentation.height ? segmentation.crops[i].y / segmentation.height : 0;
       const visualDinnerCode = /^#[1-8]$/.test(String(visualDinnerCodes[i] || "")) ? visualDinnerCodes[i] : null;
+      const inferredCode = Boolean(scannerInferredCodeFlags[i]);
       let cleaned = visualDinnerCode || "";
       let score = visualDinnerCode ? 3 : -1;
+      // Always read the handwriting, even when a marker was detected. The
+      // previous build skipped OCR entirely on any line with a visual code,
+      // so when the detector was wrong there was nothing to contradict it --
+      // the crop said "Pepsi" while the line was booked as a No.4 combo.
+      // Reading both gives us a cross-check.
+      if (visualDinnerCode) {
+        try {
+          const codeCheck = await scannerRecognizeCrop(recognizer, segmentation.crops[i].image);
+          const codeCheckText = scannerCleanFormText(codeCheck, yRatio, segmentation.formMode);
+          const codeCheckScore = scannerOcrCandidateScore(codeCheckText);
+          const readsAsWord = /[a-z]{3,}/i.test(codeCheckText);
+          // Handwriting that reads as a real word AND matches a menu item
+          // beats a geometric marker guess every time.
+          if (readsAsWord && codeCheckScore >= 0.62) {
+            cleaned = codeCheckText;
+            score = codeCheckScore;
+          } else if (inferredCode) {
+            // Number was never actually read, only deduced from neighbours.
+            // Keep it, but force a human to confirm it downstream.
+            cleaned = visualDinnerCode;
+            score = 0.8;
+          }
+        } catch (codeCheckError) {
+          console.warn("Cross-check OCR failed on line", i + 1, codeCheckError);
+        }
+      }
       if (!visualDinnerCode) {
         const generated = await scannerRecognizeCrop(recognizer, segmentation.crops[i].image);
         cleaned = scannerCleanFormText(generated, yRatio, segmentation.formMode);
@@ -3409,7 +3462,8 @@ async function recognizeTicketLocally(dataUrl) {
         text: cleaned || "[unreadable handwriting]",
         image: segmentation.crops[i].image,
         yRatio: yRatio,
-        weak: Boolean(weakReading && cleaned)
+        weak: Boolean(weakReading && cleaned),
+        inferredCode: inferredCode && cleaned === visualDinnerCode
       });
     } catch (error) {
       console.warn("Local OCR could not read line", i + 1, error);
@@ -3432,6 +3486,12 @@ async function recognizeTicketLocally(dataUrl) {
   const items = orderLines.map(function(line) {
     const item = scannerMatchLocalLine(line.text, dayPart);
     item.source_image = line.image;
+    // A number nobody actually read is never billed without a human tap.
+    if (line.inferredCode) {
+      item.confidence = "medium";
+      item.needs_review = true;
+      item.inferred_code = true;
+    }
     return item;
   });
   const unreadable = items.filter(function(item) { return item.confidence === "low"; }).length;
@@ -3439,6 +3499,8 @@ async function recognizeTicketLocally(dataUrl) {
   const flags = ["Local handwriting OCR is approximate; confirm every line before sending the order to the kitchen."];
   if (segmentation.formMode) flags.push("Printed guest-check rules were removed before handwriting recognition.");
   if (dayPart === "unclear") flags.push("No reliable lunch or dinner indicator was recognized.");
+  const inferred = items.filter(function(item) { return item.inferred_code; }).length;
+  if (inferred) flags.push(inferred + " menu code" + (inferred === 1 ? " was" : "s were") + " deduced from the surrounding numbering rather than read directly. Check " + (inferred === 1 ? "it" : "them") + " against the handwriting before adding to the order.");
   if (unreadable) flags.push(unreadable + " line" + (unreadable === 1 ? " could" : "s could") + " not be matched confidently.");
   if (ambiguous) flags.push(ambiguous + " line" + (ambiguous === 1 ? " has" : "s have") + " multiple possible menu matches.");
   if (segmentation.truncated) flags.push("More than 30 marks were detected; only the first 30 regions were processed.");
@@ -3516,6 +3578,7 @@ function normalizeScannerResult(result) {
         },
         ambiguous: ambiguous,
         ambiguous_candidates: Array.isArray(item && item.ambiguous_candidates) ? item.ambiguous_candidates.map(String) : [],
+        inferred_code: Boolean(item && item.inferred_code),
         _suggestions: Array.isArray(item && item.suggestions) ? item.suggestions.filter(function(suggestion) {
           return suggestion && Number.isInteger(suggestion.index) && scannerMenuFlat[suggestion.index];
         }).slice(0, 4) : [],

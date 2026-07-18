@@ -690,6 +690,26 @@
   .scanner-item-grid .wide { grid-column: span 2; }
   .scanner-mini-label { display: block; font-size: 10px; color: #7c756b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
   .scanner-candidates { margin-top: 8px; padding: 8px 10px; background: #fff6e8; border: 1px solid #f0d1a5; border-radius: 8px; color: #765025; font-size: 12px; line-height: 1.4; }
+  .scanner-memory { margin-top: 14px; padding: 12px 14px; background: #fff; border: 1px solid #e3ded4; border-radius: 12px; }
+  .scanner-memory-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .scanner-memory-title { font-size: 13px; font-weight: 700; color: #3c3a35; }
+  .scanner-memory-count { font-size: 12px; color: #7a746a; }
+  .scanner-memory-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .scanner-memory-actions button, .scanner-memory-actions label { font-size: 12px; font-weight: 600; padding: 8px 12px; min-height: 40px;
+    display: inline-flex; align-items: center; border-radius: 8px; border: 1px solid #cfc8bc; background: #f8f5ef; color: #3c3a35; cursor: pointer; }
+  .scanner-memory-actions .danger { border-color: #e4b4b4; background: #fdf3f3; color: #a03535; }
+  .scanner-memory-list { margin-top: 10px; max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .scanner-memory-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 7px 9px; background: #f8f5ef; border-radius: 8px; }
+  .scanner-memory-row .from { font-family: ui-monospace, Menlo, monospace; color: #7a746a; flex: 0 0 auto; max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scanner-memory-row .to { font-weight: 600; color: #3c3a35; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scanner-memory-row .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: #e6e1d7; color: #6b6459; flex: 0 0 auto; }
+  .scanner-memory-row .badge.trusted { background: #0f766e; color: #fff; }
+  .scanner-memory-row .forget { border: none; background: none; color: #a03535; font-size: 15px; cursor: pointer; padding: 2px 6px; flex: 0 0 auto; min-height: 32px; }
+  .scanner-memory-empty { margin-top: 10px; font-size: 12px; color: #7a746a; line-height: 1.5; }
+  .scanner-memory-warn { margin-top: 8px; font-size: 12px; color: #a03535; line-height: 1.5; }
+  body.dark .scanner-memory { background: #1f1f1f; border-color: #333; }
+  body.dark .scanner-memory-row { background: #262626; }
+  body.dark .scanner-memory-title, body.dark .scanner-memory-row .to { color: #e8e4dc; }
   .scanner-suggestions { margin-top: 10px; }
   .scanner-suggestions .scanner-mini-label { display: block; margin-bottom: 6px; }
   .scanner-suggest-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1070,6 +1090,7 @@
             <span id="scannerModelStateText">Recognition model loads when the first ticket is analyzed.</span>
           </div>
         </div>
+        <div class="scanner-memory" id="scannerMemoryPanel"></div>
         <button class="scanner-button primary scanner-analyze" id="analyzeTicketBtn" onclick="analyzeTicket()" disabled>Read Ticket Locally</button>
         <div class="scanner-status" id="scannerStatus" role="status" aria-live="polite"></div>
         <div class="scanner-privacy">First use requires internet to download the free OCR model. Ticket photos are never uploaded.</div>
@@ -1501,9 +1522,323 @@ let scannerResult = null;
 let scannerOcrPipeline = null;
 let scannerOcrLoadingPromise = null;
 
+// ===========================================================================
+// Scanner memory (v9)
+//
+// Everything here is on-device. No account, no server, no network call. The
+// scanner remembers two things across sessions:
+//
+//   1. Aliases  - "the OCR read THIS, a human said it was THAT menu item".
+//   2. Digit shapes - real handwritten major numbers, kept as small feature
+//      vectors and used alongside the font-rendered templates.
+//
+// Aliases are stored against the menu item NAME rather than its index,
+// because the index shifts whenever the menu is edited and would silently
+// start pointing at the wrong dish.
+// ===========================================================================
+
+const SCANNER_MEMORY_KEY = "fourSeasScannerMemory.v1";
+const SCANNER_ALIAS_TRUST_COUNT = 2;   // corrections needed before auto-applying
+const SCANNER_MAX_ALIASES = 800;
+const SCANNER_MAX_LEARNED_DIGITS = 160;
+
+let scannerMemory = { version: 1, aliases: {}, digits: [], stats: { corrections: 0, autoApplied: 0 } };
+let scannerMemoryAvailable = true;
+
+function scannerMemoryStorage() {
+  try {
+    if (typeof localStorage === "undefined" || !localStorage) return null;
+    return localStorage;
+  } catch (error) {
+    // Private mode, embedded preview panes, and locked-down webviews all throw
+    // on access rather than returning null.
+    return null;
+  }
+}
+
+function scannerMemoryLoad() {
+  const storage = scannerMemoryStorage();
+  if (!storage) {
+    scannerMemoryAvailable = false;
+    return;
+  }
+  try {
+    const raw = storage.getItem(SCANNER_MEMORY_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    scannerMemory = {
+      version: 1,
+      aliases: parsed.aliases && typeof parsed.aliases === "object" ? parsed.aliases : {},
+      digits: Array.isArray(parsed.digits) ? parsed.digits : [],
+      stats: parsed.stats && typeof parsed.stats === "object" ? parsed.stats : { corrections: 0, autoApplied: 0 }
+    };
+  } catch (error) {
+    console.warn("Scanner memory could not be read; starting fresh.", error);
+  }
+}
+
+function scannerMemorySave() {
+  const storage = scannerMemoryStorage();
+  if (!storage) {
+    scannerMemoryAvailable = false;
+    return false;
+  }
+  try {
+    storage.setItem(SCANNER_MEMORY_KEY, JSON.stringify(scannerMemory));
+    return true;
+  } catch (error) {
+    // Quota exhausted: drop the least-used half of the aliases and retry once
+    // rather than losing the whole table.
+    console.warn("Scanner memory save failed; pruning.", error);
+    try {
+      const entries = Object.keys(scannerMemory.aliases).map(function(key) {
+        return { key: key, entry: scannerMemory.aliases[key] };
+      }).sort(function(a, b) {
+        return (b.entry.count || 0) - (a.entry.count || 0) || (b.entry.updated || 0) - (a.entry.updated || 0);
+      });
+      const kept = {};
+      entries.slice(0, Math.floor(entries.length / 2)).forEach(function(row) { kept[row.key] = row.entry; });
+      scannerMemory.aliases = kept;
+      scannerMemory.digits = scannerMemory.digits.slice(-40);
+      storage.setItem(SCANNER_MEMORY_KEY, JSON.stringify(scannerMemory));
+      return true;
+    } catch (retryError) {
+      scannerMemoryAvailable = false;
+      return false;
+    }
+  }
+}
+
+async function scannerRequestPersistentStorage() {
+  // Asks the browser not to evict this data. Matters most on iOS Safari, where
+  // an unused site's storage can be cleared after about a week.
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      const already = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+      if (!already) await navigator.storage.persist();
+    }
+  } catch (error) {
+    // Non-fatal: storage simply stays evictable.
+  }
+}
+
+function scannerMemoryKey(rawText) {
+  const words = scannerWords(rawText).join(" ");
+  const folded = scannerOcrFold(words || rawText);
+  return folded || "";
+}
+
+function scannerAliasTarget(entry) {
+  // Resolve a stored name back to a live menu row, tolerating menu edits.
+  if (!entry || !entry.name) return -1;
+  const targetName = scannerNormalizedName(entry.name);
+  let index = scannerMenuFlat.findIndex(function(row) {
+    return scannerNormalizedName(row.cleanName) === targetName &&
+      (!entry.category || row.category === entry.category);
+  });
+  if (index < 0) {
+    index = scannerMenuFlat.findIndex(function(row) {
+      return scannerNormalizedName(row.cleanName) === targetName;
+    });
+  }
+  return index;
+}
+
+function scannerLookupAlias(rawText) {
+  const key = scannerMemoryKey(rawText);
+  if (!key) return null;
+  const keys = Object.keys(scannerMemory.aliases);
+  if (!keys.length) return null;
+  let best = null;
+  keys.forEach(function(storedKey) {
+    const entry = scannerMemory.aliases[storedKey];
+    if (!entry) return;
+    let similarity;
+    if (storedKey === key) similarity = 1;
+    else {
+      const longest = Math.max(storedKey.length, key.length);
+      if (!longest) return;
+      // Only consider near-identical keys. The point of an alias is to catch a
+      // repeat of the SAME misread, not to act as a second fuzzy matcher.
+      similarity = 1 - scannerEditDistance(storedKey, key) / longest;
+      if (similarity < 0.86) return;
+    }
+    const index = scannerAliasTarget(entry);
+    if (index < 0) return;
+    const score = similarity + Math.min(0.05, (entry.count || 1) * 0.01);
+    if (!best || score > best.score) {
+      best = { index: index, entry: entry, similarity: similarity, score: score, key: storedKey };
+    }
+  });
+  return best;
+}
+
+function scannerRecordCorrection(rawText, menuIndex) {
+  const entryRow = scannerMenuFlat[menuIndex];
+  if (!entryRow) return;
+  const text = String(rawText || "");
+  if (!text || /^\[(?:unreadable handwriting|illegible)\]$/i.test(text.trim())) return;
+  const key = scannerMemoryKey(text);
+  if (!key || key.length < 2) return;
+
+  const existing = scannerMemory.aliases[key];
+  const sameTarget = existing && scannerNormalizedName(existing.name) === scannerNormalizedName(entryRow.cleanName);
+  scannerMemory.aliases[key] = {
+    name: entryRow.cleanName,
+    category: entryRow.category,
+    sample: existing && sameTarget ? existing.sample : text.slice(0, 60),
+    // A correction that contradicts what was stored resets the count, so one
+    // mis-tap cannot cement itself as trusted knowledge.
+    count: sameTarget ? (existing.count || 1) + 1 : 1,
+    updated: Date.now()
+  };
+  scannerMemory.stats.corrections = (scannerMemory.stats.corrections || 0) + 1;
+
+  const keys = Object.keys(scannerMemory.aliases);
+  if (keys.length > SCANNER_MAX_ALIASES) {
+    const ranked = keys.map(function(storedKey) {
+      return { key: storedKey, entry: scannerMemory.aliases[storedKey] };
+    }).sort(function(a, b) {
+      return (b.entry.count || 0) - (a.entry.count || 0) || (b.entry.updated || 0) - (a.entry.updated || 0);
+    });
+    const kept = {};
+    ranked.slice(0, SCANNER_MAX_ALIASES).forEach(function(row) { kept[row.key] = row.entry; });
+    scannerMemory.aliases = kept;
+  }
+  scannerMemorySave();
+}
+
+async function scannerLearnDigitShape(sourceImage, digit) {
+  // When a human confirms a major-number line, keep the actual handwriting as
+  // a template. Real strokes from the people who write these tickets beat any
+  // font we can render.
+  if (!sourceImage || !(digit >= 1 && digit <= 8)) return;
+  try {
+    const image = await loadScannerImage(sourceImage);
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    if (!width || !height) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(image, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const mask = new Uint8Array(width * height);
+    for (let point = 0, offset = 0; point < mask.length; point++, offset += 4) {
+      const luminance = pixels[offset] * 0.299 + pixels[offset + 1] * 0.587 + pixels[offset + 2] * 0.114;
+      if (luminance < 165) mask[point] = 1;
+    }
+    const region = scannerIsolateDigitRegion(width, height, mask);
+    if (!region) return;
+    const features = scannerShapeFeatures(width, height, mask, region);
+    if (!features) return;
+    const signature = Array.from(features.cells, function(value) { return Math.round(value * 100) / 100; });
+    const duplicate = scannerMemory.digits.some(function(stored) {
+      if (stored.digit !== digit || !Array.isArray(stored.cells)) return false;
+      let sum = 0;
+      for (let i = 0; i < signature.length; i++) {
+        const delta = signature[i] - (stored.cells[i] || 0);
+        sum += delta * delta;
+      }
+      return Math.sqrt(sum / signature.length) < 0.06;
+    });
+    if (duplicate) return;
+    scannerMemory.digits.push({
+      digit: digit,
+      cells: signature,
+      aspect: Math.round(features.aspect * 1000) / 1000,
+      created: Date.now()
+    });
+    if (scannerMemory.digits.length > SCANNER_MAX_LEARNED_DIGITS) {
+      scannerMemory.digits = scannerMemory.digits.slice(-SCANNER_MAX_LEARNED_DIGITS);
+    }
+    scannerLearnedDigitCache = null;
+    scannerMemorySave();
+  } catch (error) {
+    console.warn("Could not learn this major-number shape", error);
+  }
+}
+
+function scannerMemoryExport() {
+  const payload = JSON.stringify({
+    app: "Four Seas POS ticket scanner",
+    exported: new Date().toISOString(),
+    version: 1,
+    aliases: scannerMemory.aliases,
+    digits: scannerMemory.digits,
+    stats: scannerMemory.stats
+  }, null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "four-seas-scanner-memory-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
+function scannerMemoryImport(file) {
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const parsed = JSON.parse(String(reader.result || "{}"));
+      const incomingAliases = parsed && parsed.aliases && typeof parsed.aliases === "object" ? parsed.aliases : {};
+      const incomingDigits = parsed && Array.isArray(parsed.digits) ? parsed.digits : [];
+      let added = 0;
+      Object.keys(incomingAliases).forEach(function(key) {
+        const incoming = incomingAliases[key];
+        if (!incoming || !incoming.name) return;
+        const existing = scannerMemory.aliases[key];
+        // Merge rather than overwrite: keep whichever side has seen the
+        // correction more often, so importing never discards local learning.
+        if (!existing || (incoming.count || 0) > (existing.count || 0)) {
+          scannerMemory.aliases[key] = incoming;
+          added++;
+        }
+      });
+      incomingDigits.forEach(function(entry) {
+        if (entry && entry.digit >= 1 && entry.digit <= 8 && Array.isArray(entry.cells)) {
+          scannerMemory.digits.push(entry);
+          added++;
+        }
+      });
+      if (scannerMemory.digits.length > SCANNER_MAX_LEARNED_DIGITS) {
+        scannerMemory.digits = scannerMemory.digits.slice(-SCANNER_MAX_LEARNED_DIGITS);
+      }
+      scannerLearnedDigitCache = null;
+      scannerMemorySave();
+      setScannerStatus("success", "Imported " + added + " learned entr" + (added === 1 ? "y" : "ies") + ".");
+      renderScannerMemoryPanel();
+    } catch (error) {
+      setScannerStatus("error", "That file could not be read as scanner memory.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function scannerMemoryForget(key) {
+  delete scannerMemory.aliases[key];
+  scannerMemorySave();
+  renderScannerMemoryPanel();
+}
+
+function scannerMemoryClearAll() {
+  if (!confirm("Erase everything the scanner has learned on this device? This cannot be undone.")) return;
+  scannerMemory = { version: 1, aliases: {}, digits: [], stats: { corrections: 0, autoApplied: 0 } };
+  scannerLearnedDigitCache = null;
+  scannerMemorySave();
+  renderScannerMemoryPanel();
+}
+
+
 function openTicketScanner() {
   haptic("light");
   document.getElementById("ticketScannerOverlay").classList.add("show");
+  renderScannerMemoryPanel();
 }
 
 function closeTicketScanner() {
@@ -2409,13 +2744,33 @@ function scannerBuildDigitTemplates() {
   return templates;
 }
 
+let scannerLearnedDigitCache = null;
+
+function scannerLearnedDigitTemplates() {
+  if (scannerLearnedDigitCache) return scannerLearnedDigitCache;
+  scannerLearnedDigitCache = (scannerMemory.digits || []).filter(function(entry) {
+    return entry && entry.digit >= 1 && entry.digit <= 8 &&
+      Array.isArray(entry.cells) && entry.cells.length === SCANNER_SHAPE_GRID * SCANNER_SHAPE_GRID;
+  }).map(function(entry) {
+    return {
+      digit: entry.digit,
+      learned: true,
+      features: { cells: Float32Array.from(entry.cells), aspect: entry.aspect || 1 }
+    };
+  });
+  return scannerLearnedDigitCache;
+}
+
 function scannerClassifyDigitShape(features) {
   if (!features) return null;
-  const templates = scannerBuildDigitTemplates();
+  const templates = scannerBuildDigitTemplates().concat(scannerLearnedDigitTemplates());
   if (!templates.length) return null;
   const bestByDigit = {};
   templates.forEach(function(template) {
-    const distance = scannerShapeDistance(features, template.features);
+    let distance = scannerShapeDistance(features, template.features);
+    // Templates captured from this restaurant's own handwriting are better
+    // evidence than a font, so give them a modest head start.
+    if (template.learned) distance *= 0.82;
     if (bestByDigit[template.digit] == null || distance < bestByDigit[template.digit]) {
       bestByDigit[template.digit] = distance;
     }
@@ -2514,6 +2869,54 @@ function scannerLooksLikeHash(width, height, mask, region) {
   const density = ink / (boxWidth * boxHeight);
   const aspect = boxWidth / boxHeight;
   return density > 0.18 && aspect > 0.55 && aspect < 1.9;
+}
+
+function scannerIsolateDigitRegion(width, height, mask) {
+  // Shared by live classification and by shape learning: find the numeral
+  // sitting to the right of the "#" in a major-number crop.
+  const components = scannerConnectedComponents(width, height, mask);
+  if (!components.length) return null;
+  const largestArea = components.reduce(function(largest, component) {
+    return Math.max(largest, component.area);
+  }, 0);
+  const kept = components.filter(function(component) {
+    const thinRule = component.height <= Math.max(4, height * 0.02) && component.width > width * 0.08;
+    return component.area >= Math.max(8, largestArea * 0.02) && !thinRule;
+  });
+  if (!kept.length) return null;
+  let minX = width, maxX = -1, minY = height, maxY = -1;
+  kept.forEach(function(component) {
+    minX = Math.min(minX, component.minX);
+    maxX = Math.max(maxX, component.maxX);
+    minY = Math.min(minY, component.minY);
+    maxY = Math.max(maxY, component.maxY);
+  });
+  if (maxX <= minX || maxY <= minY) return null;
+  const boxWidth = maxX - minX + 1;
+  const boxHeight = maxY - minY + 1;
+  const columnInk = new Uint32Array(boxWidth);
+  kept.forEach(function(component) {
+    component.points.forEach(function(point) {
+      const x = point % width;
+      columnInk[x - minX]++;
+    });
+  });
+  let bestGap = null;
+  let gapStart = -1;
+  for (let x = 0; x <= boxWidth; x++) {
+    const empty = x < boxWidth && columnInk[x] === 0;
+    if (empty && gapStart < 0) gapStart = x;
+    if (!empty && gapStart >= 0) {
+      const gapWidth = x - gapStart;
+      const center = (gapStart + x) / 2;
+      if (center > boxWidth * 0.22 && center < boxWidth * 0.85 && gapWidth >= Math.max(2, boxHeight * 0.05)) {
+        if (!bestGap || gapWidth > bestGap.width) bestGap = { width: gapWidth, split: x };
+      }
+      gapStart = -1;
+    }
+  }
+  if (!bestGap) return null;
+  return { x1: minX + bestGap.split, x2: maxX, y1: minY, y2: maxY };
 }
 
 function scannerClassifyDinnerCodeMask(width, height, mask) {
@@ -2810,6 +3213,28 @@ function scannerMatchLocalLine(rawText, dayPart) {
     };
   }
 
+  // Learned corrections come first: a human already answered this exact
+  // question on this device, which outranks any similarity score.
+  const learned = scannerLookupAlias(rawText);
+  if (learned && (learned.entry.count || 0) >= SCANNER_ALIAS_TRUST_COUNT) {
+    const learnedEntry = scannerMenuFlat[learned.index];
+    scannerMemory.stats.autoApplied = (scannerMemory.stats.autoApplied || 0) + 1;
+    return {
+      raw_text: rawText,
+      quantity: quantity,
+      matched_item: learnedEntry.cleanName,
+      category: learnedEntry.category,
+      price_each: Number(learnedEntry.item.price),
+      modifiers: modifiers,
+      ambiguous: false,
+      ambiguous_candidates: [],
+      suggestions: [],
+      learned_match: true,
+      confidence: "high",
+      needs_review: false
+    };
+  }
+
   const exactAlias = scannerOperationalAlias(rawText);
   if (exactAlias) {
     const aliasEntry = scannerMenuFlat.find(function(entry) { return entry.cleanName === exactAlias; });
@@ -2846,7 +3271,7 @@ function scannerMatchLocalLine(rawText, dayPart) {
   // Always carry the best few menu guesses forward, even for a line we cannot
   // match. Offering three tappable menu items beats showing a reviewer three
   // meaningless raw OCR strings.
-  const suggestions = scored.filter(function(candidate) { return candidate.score > 0.28; })
+  let suggestions = scored.filter(function(candidate) { return candidate.score > 0.28; })
     .slice(0, 4)
     .map(function(candidate) {
       return {
@@ -2857,6 +3282,19 @@ function scannerMatchLocalLine(rawText, dayPart) {
         score: Math.round(candidate.score * 100)
       };
     });
+  // Seen this misread once before but not yet twice: surface it first and let
+  // a human confirm it a second time before it becomes trusted.
+  if (learned) {
+    const learnedRow = scannerMenuFlat[learned.index];
+    suggestions = [{
+      index: learned.index,
+      label: learnedRow.cleanName,
+      category: learnedRow.category,
+      price: Number(learnedRow.item.price),
+      score: 99,
+      learned: true
+    }].concat(suggestions.filter(function(suggestion) { return suggestion.index !== learned.index; })).slice(0, 4);
+  }
 
   if (!top || top.score < 0.55) {
     return {
@@ -3159,6 +3597,63 @@ function scannerMenuOptions(selectedIndex, customSelected) {
   return options;
 }
 
+function renderScannerMemoryPanel() {
+  const panel = document.getElementById("scannerMemoryPanel");
+  if (!panel) return;
+  const keys = Object.keys(scannerMemory.aliases || {});
+  const trusted = keys.filter(function(key) {
+    return (scannerMemory.aliases[key].count || 0) >= SCANNER_ALIAS_TRUST_COUNT;
+  }).length;
+  const digits = (scannerMemory.digits || []).length;
+
+  const rows = keys.map(function(key) {
+    return { key: key, entry: scannerMemory.aliases[key] };
+  }).sort(function(a, b) {
+    return (b.entry.updated || 0) - (a.entry.updated || 0);
+  }).map(function(row) {
+    const isTrusted = (row.entry.count || 0) >= SCANNER_ALIAS_TRUST_COUNT;
+    return '<div class="scanner-memory-row">' +
+      '<span class="from">' + scannerEsc(row.entry.sample || row.key) + "</span>" +
+      "<span>&rarr;</span>" +
+      '<span class="to">' + scannerEsc(row.entry.name) + "</span>" +
+      '<span class="badge' + (isTrusted ? " trusted" : "") + '">' +
+        (isTrusted ? "auto" : "seen " + (row.entry.count || 1) + "&times;") + "</span>" +
+      '<button class="forget" type="button" data-forget="' + scannerEsc(row.key) + '" title="Forget this" aria-label="Forget this correction">&times;</button>' +
+    "</div>";
+  }).join("");
+
+  panel.innerHTML =
+    '<div class="scanner-memory-head">' +
+      '<span class="scanner-memory-title">What this device has learned</span>' +
+      '<span class="scanner-memory-count">' + trusted + " auto &middot; " + keys.length + " total &middot; " + digits + " handwriting sample" + (digits === 1 ? "" : "s") + "</span>" +
+    "</div>" +
+    (keys.length
+      ? '<div class="scanner-memory-list">' + rows + "</div>"
+      : '<div class="scanner-memory-empty">Nothing yet. Each time you confirm the right menu item for a misread line, it is remembered here. After the same correction is made twice, the scanner applies it automatically.</div>') +
+    '<div class="scanner-memory-actions">' +
+      '<button type="button" id="scannerMemoryExportBtn">Export backup</button>' +
+      '<label for="scannerMemoryImportInput">Import backup</label>' +
+      '<input type="file" id="scannerMemoryImportInput" accept="application/json,.json" style="display:none">' +
+      (keys.length || digits ? '<button type="button" class="danger" id="scannerMemoryClearBtn">Erase all</button>' : "") +
+    "</div>" +
+    (scannerMemoryAvailable
+      ? ""
+      : '<div class="scanner-memory-warn">This browser is blocking local storage, so nothing can be remembered between visits. Open the app as a saved page or add it to your Home Screen.</div>');
+
+  const exportBtn = document.getElementById("scannerMemoryExportBtn");
+  if (exportBtn) exportBtn.addEventListener("click", scannerMemoryExport);
+  const clearBtn = document.getElementById("scannerMemoryClearBtn");
+  if (clearBtn) clearBtn.addEventListener("click", scannerMemoryClearAll);
+  const importInput = document.getElementById("scannerMemoryImportInput");
+  if (importInput) importInput.addEventListener("change", function() {
+    if (this.files && this.files[0]) scannerMemoryImport(this.files[0]);
+    this.value = "";
+  });
+  panel.querySelectorAll("[data-forget]").forEach(function(button) {
+    button.addEventListener("click", function() { scannerMemoryForget(this.dataset.forget); });
+  });
+}
+
 function renderScannerResults() {
   if (!scannerResult) return;
   const container = document.getElementById("scannerResults");
@@ -3191,7 +3686,7 @@ function renderScannerResults() {
               ' data-scanner-suggest="' + index + '" data-menu-index="' + suggestion.index + '">' +
               "<span>" + scannerEsc(suggestion.label) + "</span>" +
               '<span class="price">$' + suggestion.price.toFixed(2) + "</span>" +
-              '<span class="match">' + suggestion.score + "%</span>" +
+              '<span class="match">' + (suggestion.learned ? "learned" : suggestion.score + "%") + "</span>" +
             "</button>";
           }).join("") + "</div></div>"
         : "";
@@ -3327,6 +3822,13 @@ function updateScannerItem(index, field, value) {
     item._menuIndex = Number.isInteger(menuIndex) ? menuIndex : -1;
     if (item._menuIndex >= 0 && scannerMenuFlat[item._menuIndex]) {
       const entry = scannerMenuFlat[item._menuIndex];
+      // This is the learning moment: a human just told us what this
+      // handwriting means. Remember it for next time.
+      scannerRecordCorrection(item.raw_text, item._menuIndex);
+      const majorNumber = String(entry.cleanName).match(/^No\.\s*([1-8])/);
+      if (majorNumber && item._sourceImage) {
+        scannerLearnDigitShape(item._sourceImage, Number(majorNumber[1]));
+      }
       item._custom = false;
       item.matched_item = entry.cleanName;
       item.category = entry.category;
@@ -3348,6 +3850,7 @@ function updateScannerItem(index, field, value) {
   }
   recalculateScannerSubtotal(scannerResult);
   renderScannerResults();
+  renderScannerMemoryPanel();
 }
 
 function recalculateScannerSubtotal(result) {
@@ -6518,6 +7021,9 @@ function initTheme() {
 
 // Init
 initTheme();
+scannerMemoryLoad();
+scannerRequestPersistentStorage();
+renderScannerMemoryPanel();
 loadUnavailable();
 loadHistory();
 updateHistoryBadge();

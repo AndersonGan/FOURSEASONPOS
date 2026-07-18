@@ -1413,6 +1413,7 @@ const menu = {
     { name: "Pad Thai (Shrimp)", price: 17.75, noRice: true },
   ],
   "Drinks": [
+    { name: "Water", price: 0, section: "Sodas" },
     { name: "Dr. Pepper", price: 3.50, section: "Sodas" },
     { name: "Lemonade", price: 3.50, section: "Sodas" },
     { name: "Starry", price: 3.50, section: "Sodas" },
@@ -1685,19 +1686,107 @@ function scannerOtsuThreshold(histogram, total) {
   return Math.max(85, Math.min(210, bestThreshold));
 }
 
+function scannerDetectPaperBounds(image) {
+  const locatorWidth = Math.min(300, Math.max(120, image.naturalWidth));
+  const locatorHeight = Math.max(1, Math.round(image.naturalHeight * locatorWidth / image.naturalWidth));
+  const locator = document.createElement("canvas");
+  locator.width = locatorWidth;
+  locator.height = locatorHeight;
+  const locatorCtx = locator.getContext("2d", { willReadFrequently: true });
+  locatorCtx.drawImage(image, 0, 0, locatorWidth, locatorHeight);
+  const locatorPixels = locatorCtx.getImageData(0, 0, locatorWidth, locatorHeight).data;
+  const luminanceHistogram = new Uint32Array(256);
+  for (let i = 0; i < locatorPixels.length; i += 4) {
+    const luminance = Math.round(locatorPixels[i] * 0.299 + locatorPixels[i + 1] * 0.587 + locatorPixels[i + 2] * 0.114);
+    luminanceHistogram[luminance]++;
+  }
+  const paperLuminance = Math.max(88, Math.min(155,
+    scannerOtsuThreshold(luminanceHistogram, locatorWidth * locatorHeight) + 8));
+  const mask = new Uint8Array(locatorWidth * locatorHeight);
+  for (let p = 0, i = 0; p < mask.length; p++, i += 4) {
+    const red = locatorPixels[i];
+    const green = locatorPixels[i + 1];
+    const blue = locatorPixels[i + 2];
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const saturation = maximum ? (maximum - minimum) / maximum : 0;
+    const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+    if (luminance >= paperLuminance && saturation <= 0.58) mask[p] = 1;
+  }
+
+  const stack = new Int32Array(mask.length);
+  let best = null;
+  for (let seed = 0; seed < mask.length; seed++) {
+    if (!mask[seed]) continue;
+    let stackSize = 0;
+    stack[stackSize++] = seed;
+    mask[seed] = 0;
+    let count = 0;
+    let minX = locatorWidth;
+    let maxX = 0;
+    let minY = locatorHeight;
+    let maxY = 0;
+    while (stackSize) {
+      const point = stack[--stackSize];
+      const x = point % locatorWidth;
+      const y = Math.floor(point / locatorWidth);
+      count++;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      if (x > 0 && mask[point - 1]) {
+        mask[point - 1] = 0;
+        stack[stackSize++] = point - 1;
+      }
+      if (x + 1 < locatorWidth && mask[point + 1]) {
+        mask[point + 1] = 0;
+        stack[stackSize++] = point + 1;
+      }
+      if (y > 0 && mask[point - locatorWidth]) {
+        mask[point - locatorWidth] = 0;
+        stack[stackSize++] = point - locatorWidth;
+      }
+      if (y + 1 < locatorHeight && mask[point + locatorWidth]) {
+        mask[point + locatorWidth] = 0;
+        stack[stackSize++] = point + locatorWidth;
+      }
+    }
+    const boxArea = (maxX - minX + 1) * (maxY - minY + 1);
+    if ((!best || count > best.count) &&
+        count >= mask.length * 0.06 && boxArea >= mask.length * 0.12) {
+      best = { count: count, minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+    }
+  }
+
+  if (!best) {
+    return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+  }
+  const scaleX = image.naturalWidth / locatorWidth;
+  const scaleY = image.naturalHeight / locatorHeight;
+  const paddingX = Math.round((best.maxX - best.minX + 1) * scaleX * 0.025);
+  const paddingY = Math.round((best.maxY - best.minY + 1) * scaleY * 0.015);
+  const x1 = Math.max(0, Math.floor(best.minX * scaleX) - paddingX);
+  const y1 = Math.max(0, Math.floor(best.minY * scaleY) - paddingY);
+  const x2 = Math.min(image.naturalWidth, Math.ceil((best.maxX + 1) * scaleX) + paddingX);
+  const y2 = Math.min(image.naturalHeight, Math.ceil((best.maxY + 1) * scaleY) + paddingY);
+  return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+}
+
 async function segmentTicketIntoLines(dataUrl) {
   const image = await loadScannerImage(dataUrl);
+  const paper = scannerDetectPaperBounds(image);
   const maxWidth = 1500;
-  const scale = Math.min(1, maxWidth / image.naturalWidth);
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const scale = Math.min(1, maxWidth / paper.width);
+  const width = Math.max(1, Math.round(paper.width * scale));
+  const height = Math.max(1, Math.round(paper.height * scale));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, width, height);
-  ctx.drawImage(image, 0, 0, width, height);
+  ctx.drawImage(image, paper.x, paper.y, paper.width, paper.height, 0, 0, width, height);
   const pixels = ctx.getImageData(0, 0, width, height);
   const gray = new Uint8Array(width * height);
   const histogram = new Uint32Array(256);
@@ -1707,18 +1796,95 @@ async function segmentTicketIntoLines(dataUrl) {
     histogram[value]++;
   }
   const threshold = scannerOtsuThreshold(histogram, gray.length);
-  const rowInk = new Uint32Array(height);
   const edgeMargin = Math.max(2, Math.round(width * 0.02));
+  const rawRowInk = new Uint32Array(height);
   for (let y = 0; y < height; y++) {
     let count = 0;
     const offset = y * width;
     for (let x = edgeMargin; x < width - edgeMargin; x++) {
       if (gray[offset + x] < threshold) count++;
     }
+    rawRowInk[y] = count;
+  }
+
+  // Guest-check forms have long horizontal and vertical rules. Detect those
+  // separately so they do not become dozens of fake handwriting lines.
+  const ruleRows = new Uint8Array(height);
+  const strongRuleRows = new Uint8Array(height);
+  const ruleRowThreshold = Math.max(30, Math.round(width * 0.30));
+  for (let y = 0; y < height; y++) {
+    if (rawRowInk[y] >= ruleRowThreshold) strongRuleRows[y] = 1;
+  }
+  let ruleCount = 0;
+  let insideRule = false;
+  for (let y = 0; y < height; y++) {
+    if (strongRuleRows[y] && !insideRule) ruleCount++;
+    insideRule = Boolean(strongRuleRows[y]);
+  }
+  const formMode = ruleCount >= 5;
+  if (formMode) {
+    const rulePadding = Math.max(1, Math.round(width * 0.002));
+    for (let y = 0; y < height; y++) {
+      if (!strongRuleRows[y]) continue;
+      for (let fill = Math.max(0, y - rulePadding); fill <= Math.min(height - 1, y + rulePadding); fill++) {
+        ruleRows[fill] = 1;
+      }
+    }
+  }
+
+  const ruleColumns = new Uint8Array(width);
+  if (formMode) {
+    const columnInk = new Uint32Array(width);
+    for (let y = 0; y < height; y++) {
+      if (ruleRows[y]) continue;
+      const offset = y * width;
+      for (let x = edgeMargin; x < width - edgeMargin; x++) {
+        if (gray[offset + x] < threshold) columnInk[x]++;
+      }
+    }
+    const ruleColumnThreshold = Math.max(40, Math.round(height * 0.16));
+    const columnPadding = Math.max(1, Math.round(width * 0.002));
+    for (let x = edgeMargin; x < width - edgeMargin; x++) {
+      if (columnInk[x] < ruleColumnThreshold) continue;
+      for (let fill = Math.max(0, x - columnPadding); fill <= Math.min(width - 1, x + columnPadding); fill++) {
+        ruleColumns[fill] = 1;
+      }
+    }
+  }
+
+  const cleanedCanvas = document.createElement("canvas");
+  cleanedCanvas.width = width;
+  cleanedCanvas.height = height;
+  const cleanedCtx = cleanedCanvas.getContext("2d");
+  const cleanedPixels = cleanedCtx.createImageData(width, height);
+  cleanedPixels.data.set(pixels.data);
+  if (formMode) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!ruleRows[y] && !ruleColumns[x]) continue;
+        const offset = (y * width + x) * 4;
+        cleanedPixels.data[offset] = 255;
+        cleanedPixels.data[offset + 1] = 255;
+        cleanedPixels.data[offset + 2] = 255;
+      }
+    }
+  }
+  cleanedCtx.putImageData(cleanedPixels, 0, 0);
+
+  const scanXStart = formMode ? Math.max(edgeMargin, Math.round(width * 0.05)) : edgeMargin;
+  const scanXEnd = formMode ? Math.min(width - edgeMargin, Math.round(width * 0.82)) : width - edgeMargin;
+  const rowInk = new Uint32Array(height);
+  for (let y = 0; y < height; y++) {
+    if (ruleRows[y]) continue;
+    const offset = y * width;
+    let count = 0;
+    for (let x = scanXStart; x < scanXEnd; x++) {
+      if (!ruleColumns[x] && gray[offset + x] < threshold) count++;
+    }
     rowInk[y] = count;
   }
 
-  const minimumInk = Math.max(4, Math.round(width * 0.004));
+  const minimumInk = Math.max(8, Math.round(width * 0.006));
   const active = Array.from(rowInk, function(count) { return count >= minimumInk; });
   const bridge = Math.max(3, Math.round(height * 0.004));
   let gapStart = -1;
@@ -1753,9 +1919,10 @@ async function segmentTicketIntoLines(dataUrl) {
     let x2 = 0;
     let inkPixels = 0;
     for (let y = segment.start; y <= segment.end; y++) {
+      if (ruleRows[y]) continue;
       const offset = y * width;
-      for (let x = edgeMargin; x < width - edgeMargin; x++) {
-        if (gray[offset + x] < threshold) {
+      for (let x = scanXStart; x < scanXEnd; x++) {
+        if (!ruleColumns[x] && gray[offset + x] < threshold) {
           x1 = Math.min(x1, x);
           x2 = Math.max(x2, x);
           inkPixels++;
@@ -1778,7 +1945,7 @@ async function segmentTicketIntoLines(dataUrl) {
     outputCtx.fillRect(0, 0, output.width, output.height);
     outputCtx.imageSmoothingEnabled = true;
     outputCtx.imageSmoothingQuality = "high";
-    outputCtx.drawImage(canvas, x1, y1, cropWidth, cropHeight, 14, 12, output.width - 28, output.height - 24);
+    outputCtx.drawImage(cleanedCanvas, x1, y1, cropWidth, cropHeight, 14, 12, output.width - 28, output.height - 24);
     crops.push({
       image: output.toDataURL("image/png"),
       y: segment.start,
@@ -1787,12 +1954,15 @@ async function segmentTicketIntoLines(dataUrl) {
   });
 
   if (!crops.length) {
-    crops.push({ image: canvas.toDataURL("image/png"), y: 0, inkPixels: 1 });
+    crops.push({ image: cleanedCanvas.toDataURL("image/png"), y: 0, inkPixels: 1 });
   }
   return {
     crops: crops,
     truncated: segments.length > 30,
-    detectedCount: segments.length
+    detectedCount: segments.length,
+    height: height,
+    formMode: formMode,
+    ruleCount: ruleCount
   };
 }
 
@@ -1816,7 +1986,21 @@ function scannerExpandAbbreviations(value) {
     .replace(/\bkp\b/g, "kung pao")
     .replace(/\bgen(?:eral)?\s*t(?:so|ao)s?\b/g, "general tso")
     .replace(/\bs\s*&?\s*s\b/g, "sweet sour")
+    .replace(/\bwtr\b/g, "water")
     .replace(/\bw\//g, "with");
+}
+
+function scannerCleanFormText(value, yRatio, formMode) {
+  let text = cleanLocalOcrText(value);
+  if (!formMode || !text) return text;
+  const lower = text.toLowerCase();
+  if (/guest\s*check/.test(lower)) return "";
+  const headingWords = ["appt", "appetizer", "soup", "salad", "entree", "dinner", "dessert", "beverage"];
+  const headingMatches = headingWords.filter(function(word) { return lower.indexOf(word) >= 0; }).length;
+  if (headingMatches >= 3) return "";
+  if (yRatio > 0.82 && /thank|please\s+come|come\s+again/.test(lower)) return "";
+  if (yRatio > 0.60 && /^\s*(?:tax|total|subtotal|amount)\b/i.test(text)) return "";
+  return text;
 }
 
 function scannerStripMenuCode(value) {
@@ -1828,7 +2012,8 @@ function scannerStripMenuCode(value) {
 }
 
 function scannerWords(value) {
-  return scannerExpandAbbreviations(value)
+  const withoutQuantity = String(value || "").replace(/^\s*(?:\d{1,2}\s*[x×]|[x×]\s*\d{1,2})\s*/i, "");
+  return scannerExpandAbbreviations(withoutQuantity)
     .replace(/\b(mild|medium|med|spicy|hot|extra|ex|no|without|add)\b/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
@@ -1878,6 +2063,8 @@ function scannerDetectCode(rawText) {
   const text = String(rawText || "");
   let match = text.match(/\bL[\s.#-]*(1[0-8]|[1-9])\b/i);
   if (match) return { type: "lunch", value: "L" + Number(match[1]) };
+  match = text.match(/#\s*([1-8])\b/i);
+  if (match) return { type: "dinner", value: "No." + Number(match[1]) };
   match = text.match(/\b(?:NO|N0)[\s.#-]*([1-8])\b/i);
   if (match) return { type: "dinner", value: "No." + Number(match[1]) };
   match = text.match(/\bSTYLE[\s.#-]*([A-D])\b/i);
@@ -1929,7 +2116,7 @@ function scannerDayPartFromLines(lines) {
 
 function scannerLooksLikeHeader(rawText, index, total) {
   if (index > Math.max(2, Math.ceil(total * 0.35))) return false;
-  return /\b(table|name|order|ticket|server|guest|dine|take\s*out|pickup|date|time|lunch|dinner)\b/i.test(rawText);
+  return /\b(table|name|order|ticket|server|guest|dine|take\s*out|pickup|date|time|lunch|dinner|guest\s*check)\b/i.test(rawText);
 }
 
 function scannerFormatCandidate(entry) {
@@ -1955,6 +2142,28 @@ function scannerMatchLocalLine(rawText, dayPart) {
       confidence: "high",
       needs_review: false
     };
+  }
+
+  const simpleWords = scannerWords(rawText).join(" ");
+  let exactAlias = null;
+  if (/^plates?$/.test(simpleWords)) exactAlias = "Paper Plates";
+  else if (/^waters?$/.test(simpleWords)) exactAlias = "Water";
+  if (exactAlias) {
+    const aliasEntry = scannerMenuFlat.find(function(entry) { return entry.cleanName === exactAlias; });
+    if (aliasEntry) {
+      return {
+        raw_text: rawText,
+        quantity: quantity,
+        matched_item: aliasEntry.cleanName,
+        category: aliasEntry.category,
+        price_each: Number(aliasEntry.item.price),
+        modifiers: modifiers,
+        ambiguous: false,
+        ambiguous_candidates: [],
+        confidence: "high",
+        needs_review: false
+      };
+    }
   }
 
   let scored = scannerMenuFlat.map(function(entry, index) {
@@ -2040,10 +2249,13 @@ async function recognizeTicketLocally(dataUrl) {
     try {
       const output = await recognizer(segmentation.crops[i].image, { max_new_tokens: 64 });
       const generated = Array.isArray(output) && output[0] ? output[0].generated_text : "";
-      rawLines.push(cleanLocalOcrText(generated) || "[illegible mark]");
+      const yRatio = segmentation.height ? segmentation.crops[i].y / segmentation.height : 0;
+      const cleaned = scannerCleanFormText(generated, yRatio, segmentation.formMode);
+      if (cleaned) rawLines.push(cleaned);
+      else if (!segmentation.formMode) rawLines.push("[illegible mark]");
     } catch (error) {
       console.warn("Local OCR could not read line", i + 1, error);
-      rawLines.push("[illegible mark]");
+      if (!segmentation.formMode) rawLines.push("[illegible mark]");
     }
   }
 
@@ -2058,6 +2270,7 @@ async function recognizeTicketLocally(dataUrl) {
   const unreadable = items.filter(function(item) { return item.confidence === "low"; }).length;
   const ambiguous = items.filter(function(item) { return item.ambiguous; }).length;
   const flags = ["Local handwriting OCR is approximate; confirm every line before sending the order to the kitchen."];
+  if (segmentation.formMode) flags.push("Printed guest-check rules were removed before handwriting recognition.");
   if (dayPart === "unclear") flags.push("No reliable lunch or dinner indicator was recognized.");
   if (unreadable) flags.push(unreadable + " line" + (unreadable === 1 ? " could" : "s could") + " not be matched confidently.");
   if (ambiguous) flags.push(ambiguous + " line" + (ambiguous === 1 ? " has" : "s have") + " multiple possible menu matches.");
